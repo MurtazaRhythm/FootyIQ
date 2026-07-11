@@ -1,15 +1,19 @@
 import { useCallback, useRef, useState } from "react";
 import type {
+  HypeMode,
   Intensity,
   Language,
   Message,
   Persona,
   PipelineState,
+  Source,
 } from "@/lib/types";
+import { HYPE_LABELS } from "@/lib/types";
 
 interface ChatResponse {
   text: string;
   intensity?: Intensity;
+  sources?: Source[];
 }
 
 const PIPELINE_STEPS: PipelineState[] = [
@@ -44,7 +48,7 @@ export function useChat(persona: Persona, language: Language) {
   };
 
   const sendMessage = useCallback(
-    async (text: string, image?: string) => {
+    async (text: string, image?: string, opts?: { voice?: boolean }) => {
       const userMessage: Message = {
         id: makeId(),
         role: "user",
@@ -85,6 +89,9 @@ export function useChat(persona: Persona, language: Language) {
             role: "coach",
             text: data.text,
             intensity: data.intensity ?? "calm",
+            sources: data.sources ?? [],
+            // hands-free loop: a spoken question gets a spoken answer
+            autoSpeak: opts?.voice ?? false,
             timestamp: Date.now(),
           },
         ]);
@@ -106,11 +113,61 @@ export function useChat(persona: Persona, language: Language) {
     [persona, language],
   );
 
+  // F9: one-tap hype content — appears in the chat like any other exchange
+  const sendHype = useCallback(
+    async (team: string, mode: HypeMode) => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: makeId(),
+          role: "user",
+          text: HYPE_LABELS[language][mode].replace("{team}", team),
+          timestamp: Date.now(),
+        },
+      ]);
+      startPipeline();
+      try {
+        const res = await fetch("/hype", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ team, mode, language }),
+        });
+        if (!res.ok) throw new Error(`hype request failed: ${res.status}`);
+        const data: ChatResponse = await res.json();
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: makeId(),
+            role: "coach",
+            text: data.text,
+            intensity: data.intensity ?? "explosive",
+            sources: data.sources ?? [],
+            timestamp: Date.now(),
+          },
+        ]);
+      } catch {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: makeId(),
+            role: "coach",
+            text: "I couldn't reach the hype desk. Make sure the backend is running, then try again.",
+            intensity: "calm",
+            timestamp: Date.now(),
+          },
+        ]);
+      } finally {
+        clearPipeline();
+      }
+    },
+    [language],
+  );
+
   // wipe the session and return to the landing state
   const resetChat = useCallback(() => {
     clearPipeline();
     setMessages([]);
   }, []);
 
-  return { messages, pipelineState, sendMessage, resetChat };
+  return { messages, pipelineState, sendMessage, sendHype, resetChat };
 }

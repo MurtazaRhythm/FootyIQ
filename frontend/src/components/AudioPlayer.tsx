@@ -9,12 +9,19 @@ interface AudioPlayerProps {
   text: string;
   intensity: Intensity;
   language: Language;
+  autoPlay?: boolean; // voice-initiated replies speak immediately (F8)
 }
 
-export default function AudioPlayer({ text, intensity, language }: AudioPlayerProps) {
+export default function AudioPlayer({
+  text,
+  intensity,
+  language,
+  autoPlay = false,
+}: AudioPlayerProps) {
   const [state, setState] = useState<AudioState>("idle");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const urlRef = useRef<string | null>(null);
+  const startedRef = useRef(false);
   const color = INTENSITY_COLORS[intensity];
 
   useEffect(() => {
@@ -23,6 +30,14 @@ export default function AudioPlayer({ text, intensity, language }: AudioPlayerPr
       if (urlRef.current) URL.revokeObjectURL(urlRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (autoPlay && !startedRef.current) {
+      startedRef.current = true;
+      play();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPlay]);
 
   const stop = () => {
     audioRef.current?.pause();

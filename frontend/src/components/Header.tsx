@@ -1,3 +1,4 @@
+import { ALargeSmall } from "lucide-react";
 import { PERSONAS, LANGUAGES } from "@/lib/types";
 import type { Language, Persona } from "@/lib/types";
 
@@ -5,8 +6,10 @@ interface HeaderProps {
   isActive: boolean;
   persona: Persona;
   language: Language;
+  largeText: boolean;
   onPersonaChange: (p: Persona) => void;
   onLanguageChange: (l: Language) => void;
+  onLargeTextToggle: () => void;
   onHomeClick: () => void;
 }
 
@@ -14,8 +17,10 @@ export default function Header({
   isActive,
   persona,
   language,
+  largeText,
   onPersonaChange,
   onLanguageChange,
+  onLargeTextToggle,
   onHomeClick,
 }: HeaderProps) {
   return (
@@ -33,9 +38,24 @@ export default function Header({
         <span className="text-base font-semibold tracking-tight">FootyIQ</span>
       </button>
 
-      {/* persona and language collapse into compact header chips after first message */}
-      {isActive && (
-        <div className="flex items-center gap-2 overflow-x-auto">
+      <div className="flex items-center gap-2 overflow-x-auto">
+        <button
+          onClick={onLargeTextToggle}
+          className={`shrink-0 w-9 h-9 flex items-center justify-center rounded-full border transition-colors ${
+            largeText
+              ? "border-accent/60 bg-accent/10 text-accent"
+              : "border-border bg-surface text-muted hover:text-primary"
+          }`}
+          aria-pressed={largeText}
+          aria-label="Toggle larger text"
+          title="Larger text"
+        >
+          <ALargeSmall size={18} />
+        </button>
+
+        {/* persona and language collapse into compact header chips after first message */}
+        {isActive && (
+          <>
           <div className="flex items-center gap-1 rounded-full border border-border bg-surface p-1">
             {PERSONAS.map((p) => (
               <button
@@ -52,7 +72,7 @@ export default function Header({
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-1 rounded-full border border-border bg-surface p-1">
+            <div className="flex items-center gap-1 rounded-full border border-border bg-surface p-1">
             {LANGUAGES.map((l) => (
               <button
                 key={l.id}
@@ -67,9 +87,10 @@ export default function Header({
                 {l.label}
               </button>
             ))}
-          </div>
-        </div>
-      )}
+            </div>
+          </>
+        )}
+      </div>
     </header>
   );
 }

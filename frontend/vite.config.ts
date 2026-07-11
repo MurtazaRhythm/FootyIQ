@@ -12,10 +12,13 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      // FastAPI backend during development
-      "/chat": "http://localhost:8000",
-      "/speak": "http://localhost:8000",
-      "/transcribe": "http://localhost:8000",
+      // FastAPI backend during development. 127.0.0.1, not localhost: on
+      // Windows, localhost resolves IPv6-first and costs ~2s per request
+      // when the backend only listens on IPv4.
+      "/chat": "http://127.0.0.1:8000",
+      "/speak": "http://127.0.0.1:8000",
+      "/transcribe": "http://127.0.0.1:8000",
+      "/hype": "http://127.0.0.1:8000",
     },
   },
 });

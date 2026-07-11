@@ -22,7 +22,9 @@ function LandingBackground({ visible }: { visible: boolean }) {
     return () => window.clearTimeout(t);
   }, [visible]);
 
-  if (!mounted) return null;
+  // respect prefers-reduced-motion: skip the particle animation entirely
+  if (!mounted || window.matchMedia("(prefers-reduced-motion: reduce)").matches)
+    return null;
 
   // keep 60fps on phones
   const particleCount = width < 640 ? 300 : 600;
@@ -43,10 +45,15 @@ export default function App() {
   const [persona, setPersona] = useState<Persona>("new-fan");
   const [language, setLanguage] = useState<Language>("en");
   const [confirmingHome, setConfirmingHome] = useState(false);
-  const { messages, pipelineState, sendMessage, resetChat } = useChat(
-    persona,
-    language,
-  );
+  const [largeText, setLargeText] = useState(false);
+
+  // Tailwind sizes are rem-based, so scaling the root font-size scales the
+  // whole UI proportionally (F7 larger-text toggle)
+  useEffect(() => {
+    document.documentElement.style.fontSize = largeText ? "20px" : "";
+  }, [largeText]);
+  const { messages, pipelineState, sendMessage, sendHype, resetChat } =
+    useChat(persona, language);
 
   const isActive = messages.length > 0;
 
@@ -63,8 +70,10 @@ export default function App() {
           isActive={isActive}
           persona={persona}
           language={language}
+          largeText={largeText}
           onPersonaChange={setPersona}
           onLanguageChange={setLanguage}
+          onLargeTextToggle={() => setLargeText((v) => !v)}
           onHomeClick={() => setConfirmingHome(true)}
         />
         <ChatPanel
@@ -76,6 +85,7 @@ export default function App() {
           onPersonaChange={setPersona}
           onLanguageChange={setLanguage}
           onSend={sendMessage}
+          onHype={sendHype}
         />
       </div>
       <ConfirmDialog

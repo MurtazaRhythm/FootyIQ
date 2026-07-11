@@ -45,8 +45,30 @@ export default function MessageBubble({ message, language }: MessageBubbleProps)
         style={{ borderLeft: `3px solid ${accentColor}` }}
       >
         <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
+        {message.sources && message.sources.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-2">
+            <span className="text-xs font-mono text-muted">sources</span>
+            {message.sources.map((s) => (
+              <a
+                key={s.url}
+                href={s.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-accent/80 hover:text-accent underline underline-offset-2 truncate max-w-[16rem]"
+                title={s.title}
+              >
+                {s.title}
+              </a>
+            ))}
+          </div>
+        )}
         <div className="flex items-center justify-between gap-4">
-          <AudioPlayer text={message.text} intensity={intensity} language={language} />
+          <AudioPlayer
+            text={message.text}
+            intensity={intensity}
+            language={language}
+            autoPlay={message.autoSpeak}
+          />
           <p className="mt-1 text-xs font-mono text-muted">
             {formatTime(message.timestamp)}
           </p>

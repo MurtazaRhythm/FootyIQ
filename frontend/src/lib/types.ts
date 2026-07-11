@@ -8,12 +8,19 @@ export type PipelineState =
   | "writing commentary"
   | "generating audio";
 
+export interface Source {
+  title: string;
+  url: string;
+}
+
 export interface Message {
   id: string;
   role: "user" | "coach";
   text: string;
   image?: string; // data URL for user-attached images
   intensity?: Intensity;
+  sources?: Source[]; // Google Search grounding citations
+  autoSpeak?: boolean; // voice-initiated turns speak their reply (F8)
   timestamp: number;
 }
 
@@ -49,6 +56,48 @@ export const SUGGESTED_PROMPTS: Record<Language, string[]> = {
     "¿Contra quién juega Canadá después?",
     "Explícame el 4-3-3 de forma sencilla",
   ],
+};
+
+export type HypeMode = "preview" | "trash-talk";
+
+// user-bubble label shown when hype is requested (F9)
+export const HYPE_LABELS: Record<Language, Record<HypeMode, string>> = {
+  en: {
+    preview: "Hype me up about {team}!",
+    "trash-talk": "Give me some trash talk for {team}!",
+  },
+  fr: {
+    preview: "Chauffe-moi à bloc pour {team} !",
+    "trash-talk": "Un petit chambrage pour {team} !",
+  },
+  es: {
+    preview: "¡Dame hype de {team}!",
+    "trash-talk": "¡Dame un pique para {team}!",
+  },
+};
+
+export const HYPE_UI: Record<
+  Language,
+  { placeholder: string; preview: string; trashTalk: string; title: string }
+> = {
+  en: {
+    title: "Hype generator",
+    placeholder: "Team (e.g. Morocco)",
+    preview: "Match preview",
+    trashTalk: "Trash talk",
+  },
+  fr: {
+    title: "Générateur de hype",
+    placeholder: "Équipe (ex. Maroc)",
+    preview: "Avant-match",
+    trashTalk: "Chambrage",
+  },
+  es: {
+    title: "Generador de hype",
+    placeholder: "Equipo (ej. México)",
+    preview: "Previa del partido",
+    trashTalk: "Pique",
+  },
 };
 
 export const INTENSITY_COLORS: Record<Intensity, string> = {

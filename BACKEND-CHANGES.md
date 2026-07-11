@@ -1,8 +1,8 @@
-# Backend Changes — FastAPI Scaffold & Gemini Integration
+# Backend Changes
 
-**Date:** July 11, 2026
-**Scope:** Step 1 (backend scaffold + stub `/chat`) and Step 2 (real Gemini calls with persona/language prompts)
-**Related docs:** [PRD-worldcup-companion.md](PRD-worldcup-companion.md) · [FRONTEND-CHANGES.md](FRONTEND-CHANGES.md)
+**Last updated:** July 11, 2026
+**Scope:** FastAPI scaffold, Gemini integration (F1–F4, F9), ElevenLabs integration (F5, F6, F8)
+**Related docs:** [PRD-worldcup-companion.md](PRD-worldcup-companion.md) · [FRONTEND-CHANGES.md](FRONTEND-CHANGES.md) · [PROJECT-STATUS.md](PROJECT-STATUS.md)
 
 ---
 
@@ -76,3 +76,40 @@ First-time setup: `python -m venv .venv && .venv\Scripts\pip install -r requirem
 - **Latency is noticeable on structured-output calls** (a few seconds). Fine with the pipeline indicator; if it grows, options are trimming the system prompt or revisiting streaming.
 - **Error detail is generic by design** — clients get a plain 502; the real traceback goes to the uvicorn log. Check the backend console when debugging.
 - **`local_config.py` import pattern** means the backend must run with `backend/` as the working directory (uvicorn from inside `backend/`). The deploy will use env vars via `get_key()` instead.
+
+---
+
+## 5. F4 — Google Search grounding
+
+- The `google_search` tool is attached to **every** Gemini call ([gemini_client.py](backend/gemini_client.py)); the model decides autonomously when to search (the PRD's "model is the router" — zero keyword matching anywhere). A grounding rule in the system prompt forbids guessing real-world match facts.
+- Web sources are extracted from grounding metadata, deduplicated, and returned as `sources: [{title, url}]` on `ChatResponse` — empty for ungrounded answers.
+- **Design change from Step 2:** structured JSON output combined with the search tool silently drops grounding chunks on some responses (raw API: 10 chunks; JSON mode: 0). Since citations are the judge-facing proof of F4, intensity now rides on a parsed `INTENSITY: <level>` first line instead of `response_schema`. Fallback is `calm` if the tag is missing.
+- **Verified acceptance:** direct lookup (correct + cited), reasoning question without time-keywords (triggers grounding, reasons over results), rules question (no search, no sources).
+
+## 6. F5/F6 — ElevenLabs TTS ([eleven_client.py](backend/eleven_client.py))
+
+- `POST /speak` returns `audio/mpeg`. Voice: **George** (stock, deep British narrator) — swap `ELEVEN_VOICE_ID` in [config.py](backend/config.py) to change commentators.
+- **Intensity → delivery mapping** in config: `calm` (stability .75 / style .15) → `building` (.45/.55) → `explosive` (.25/.95).
+- **Disk cache**: MP3s keyed by `sha256(text, voice, model, settings)` in `backend/audio_cache/` (gitignored). Measured: ~3.5–7s uncached (within the PRD's <8s), **28ms cached** (PRD target <4s). Pre-cache rehearsed demo lines by playing them once.
+- **F6 is free**: `eleven_multilingual_v2` detects the language from the text — French/Spanish answers speak natively with no language parameter.
+
+## 7. F8 — Scribe voice input
+
+- `POST /transcribe` (multipart upload, any browser-recorded format) → `{text}` via Scribe (`scribe_v1`). Language auto-detected, so French speech transcribes as French and flows through the multilingual pipeline unchanged. Requires `python-multipart`.
+- **Round-trip verified:** George-voiced questions fed back through Scribe came out character-perfect in EN and FR, punctuation included.
+- ⚠️ The ElevenLabs API key needs the **`speech_to_text` permission** — a TTS-only key gets a 401 with `missing_permissions`.
+
+## 8. F9 — Hype generator
+
+- `POST /hype` `{team, mode: preview|trash-talk, language}` → same shape as `ChatResponse`.
+- `generate_hype()` uses **Gemini Pro** + search grounding: real current tournament facts are woven into the drama, with explicit instructions to lean into nostalgia/bravado for eliminated teams rather than inventing fixtures. Capped ~120 words so voicing fits ~40s of TTS quota.
+- ⚠️ Pro + grounding took ~90s in testing. If that's too slow on stage, set `GEMINI_HYPE_MODEL = "gemini-flash-latest"` in config — Flash output was nearly as good.
+
+## 9. API key history (for future debugging)
+
+1. First key (`AQ.…`) — worked on Flash; **free tier had zero Pro quota** (429, `limit: 0`), so F3 temporarily ran images on Flash.
+2. Second key — `API_KEY_SERVICE_BLOCKED` 403: created without the Generative Language API allowed in its restrictions.
+3. Third key + billing fix — initially `RESOURCE_EXHAUSTED` ("prepayment credits depleted", credits were on a different project), then working. Pro restored for vision (F3) and used for hype (F9).
+4. ElevenLabs key — worked for TTS immediately; needed the `speech_to_text` permission added for F8.
+
+The backend's `_client` caches the key at first use — **restart uvicorn after changing `local_config.py`**.

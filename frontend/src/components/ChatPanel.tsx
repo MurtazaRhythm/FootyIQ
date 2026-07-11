@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { ImagePlus, SendHorizonal, X } from "lucide-react";
-import type { Language, Persona, PipelineState, Message } from "@/lib/types";
-import { SUGGESTED_PROMPTS } from "@/lib/types";
+import { ImagePlus, Mic, SendHorizonal, Square, X, Zap } from "lucide-react";
+import type {
+  HypeMode,
+  Language,
+  Persona,
+  PipelineState,
+  Message,
+} from "@/lib/types";
+import { HYPE_UI, SUGGESTED_PROMPTS } from "@/lib/types";
 import MessageBubble from "@/components/MessageBubble";
 import PersonaPicker from "@/components/PersonaPicker";
 
@@ -13,7 +19,150 @@ interface ChatPanelProps {
   language: Language;
   onPersonaChange: (p: Persona) => void;
   onLanguageChange: (l: Language) => void;
-  onSend: (text: string, image?: string) => void;
+  onSend: (text: string, image?: string, opts?: { voice?: boolean }) => void;
+  onHype: (team: string, mode: HypeMode) => void;
+}
+
+/** F9: one-tap hype — a small popover above the input bar asking for a team
+ *  and a flavor (match preview / trash talk). */
+function HypePopover({
+  language,
+  onGenerate,
+  onClose,
+}: {
+  language: Language;
+  onGenerate: (team: string, mode: HypeMode) => void;
+  onClose: () => void;
+}) {
+  const [team, setTeam] = useState("");
+  const ui = HYPE_UI[language];
+
+  const generate = (mode: HypeMode) => {
+    if (!team.trim()) return;
+    onGenerate(team.trim(), mode);
+    onClose();
+  };
+
+  return (
+    <div className="absolute bottom-full left-0 right-0 mb-2 mx-auto max-w-2xl rounded-md border border-border bg-surface p-4 shadow-xl">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-semibold">{ui.title}</span>
+        <button
+          onClick={onClose}
+          className="w-7 h-7 flex items-center justify-center text-muted hover:text-primary"
+          aria-label="Close hype generator"
+        >
+          <X size={14} />
+        </button>
+      </div>
+      <div className="mt-3 flex flex-col sm:flex-row gap-2">
+        <input
+          value={team}
+          onChange={(e) => setTeam(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && generate("preview")}
+          placeholder={ui.placeholder}
+          autoFocus
+          className="flex-1 rounded-sm border border-border bg-bg px-3 h-10 text-sm placeholder:text-muted focus:outline-none focus:border-accent/50"
+        />
+        <div className="flex gap-2">
+          <button
+            onClick={() => generate("preview")}
+            disabled={!team.trim()}
+            className="h-10 px-4 rounded-sm bg-accent text-black text-sm font-medium disabled:opacity-30"
+          >
+            {ui.preview}
+          </button>
+          <button
+            onClick={() => generate("trash-talk")}
+            disabled={!team.trim()}
+            className="h-10 px-4 rounded-sm border border-accent/60 text-accent text-sm font-medium disabled:opacity-30"
+          >
+            {ui.trashTalk}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type MicState = "idle" | "recording" | "transcribing" | "error";
+
+/** Tap to record, tap again to stop: the clip goes to /transcribe (Scribe)
+ *  and the transcript is sent as a voice question, whose reply auto-plays —
+ *  the full hands-free loop (F8). */
+function MicButton({ onTranscript }: { onTranscript: (text: string) => void }) {
+  const [state, setState] = useState<MicState>("idle");
+  const recorderRef = useRef<MediaRecorder | null>(null);
+
+  const start = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        setState("transcribing");
+        try {
+          const form = new FormData();
+          form.append(
+            "audio",
+            new Blob(chunks, { type: recorder.mimeType }),
+            "question",
+          );
+          const res = await fetch("/transcribe", { method: "POST", body: form });
+          if (!res.ok) throw new Error(`transcribe failed: ${res.status}`);
+          const data: { text: string } = await res.json();
+          setState("idle");
+          if (data.text) onTranscript(data.text);
+        } catch {
+          setState("error");
+        }
+      };
+      recorderRef.current = recorder;
+      recorder.start();
+      setState("recording");
+    } catch {
+      // mic permission denied or no input device
+      setState("error");
+    }
+  };
+
+  if (state === "transcribing") {
+    return (
+      <div
+        className="shrink-0 w-11 h-11 flex items-center justify-center rounded-sm border border-border bg-surface"
+        aria-label="Transcribing"
+      >
+        <div className="spinner" />
+      </div>
+    );
+  }
+
+  if (state === "recording") {
+    return (
+      <button
+        onClick={() => recorderRef.current?.stop()}
+        className="shrink-0 w-11 h-11 flex items-center justify-center rounded-sm border border-red-500/60 bg-red-500/10 text-red-400"
+        aria-label="Stop recording"
+      >
+        <Square size={16} fill="currentColor" className="pulse-dot" />
+      </button>
+    );
+  }
+
+  return (
+    <button
+      onClick={start}
+      className={`shrink-0 w-11 h-11 flex items-center justify-center rounded-sm border border-border bg-surface transition-colors ${
+        state === "error" ? "text-red-400" : "text-muted hover:text-primary"
+      }`}
+      aria-label={state === "error" ? "Voice input failed, retry" : "Ask by voice"}
+      title={state === "error" ? "Voice input failed — tap to retry" : "Ask by voice"}
+    >
+      <Mic size={18} />
+    </button>
+  );
 }
 
 function PipelineIndicator({ state }: { state: PipelineState }) {
@@ -46,9 +195,11 @@ export default function ChatPanel({
   onPersonaChange,
   onLanguageChange,
   onSend,
+  onHype,
 }: ChatPanelProps) {
   const [draft, setDraft] = useState("");
   const [image, setImage] = useState<string | null>(null);
+  const [hypeOpen, setHypeOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -60,9 +211,28 @@ export default function ChatPanel({
     });
   }, [messages, pipelineState]);
 
+  // downscale to <=1280px on the long edge before upload: phone screenshots
+  // are 3-12 MB and would bloat the base64 payload and Gemini token cost
   const handleFile = (file: File) => {
     const reader = new FileReader();
-    reader.onload = () => setImage(reader.result as string);
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const MAX_EDGE = 1280;
+        const scale = Math.min(1, MAX_EDGE / Math.max(img.width, img.height));
+        if (scale === 1) {
+          setImage(dataUrl);
+          return;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext("2d")?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        setImage(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.src = dataUrl;
+    };
     reader.readAsDataURL(file);
   };
 
@@ -125,7 +295,8 @@ export default function ChatPanel({
           ref={scrollRef}
           className="chat-scroll flex-1 overflow-y-auto px-4 py-6"
         >
-          <div className="max-w-2xl mx-auto flex flex-col gap-4">
+          {/* aria-live so screen readers announce coach replies as they land */}
+          <div aria-live="polite" className="max-w-2xl mx-auto flex flex-col gap-4">
             {messages.map((m) => (
               <MessageBubble key={m.id} message={m} language={language} />
             ))}
@@ -135,7 +306,14 @@ export default function ChatPanel({
       )}
 
       {/* input bar */}
-      <div className="border-t border-border bg-bg/60 backdrop-blur-md px-4 py-3">
+      <div className="relative border-t border-border bg-bg/60 backdrop-blur-md px-4 py-3">
+        {hypeOpen && (
+          <HypePopover
+            language={language}
+            onGenerate={onHype}
+            onClose={() => setHypeOpen(false)}
+          />
+        )}
         <div className="max-w-2xl mx-auto flex items-end gap-3">
           {image && (
             <div className="relative shrink-0">
@@ -172,6 +350,22 @@ export default function ChatPanel({
               e.target.value = "";
             }}
           />
+
+          <MicButton onTranscript={(text) => onSend(text, undefined, { voice: true })} />
+
+          <button
+            onClick={() => setHypeOpen((v) => !v)}
+            className={`shrink-0 w-11 h-11 flex items-center justify-center rounded-sm border transition-colors ${
+              hypeOpen
+                ? "border-accent/60 bg-accent/10 text-accent"
+                : "border-border bg-surface text-muted hover:text-primary"
+            }`}
+            aria-label="Hype generator"
+            aria-expanded={hypeOpen}
+            title="Hype generator"
+          >
+            <Zap size={18} />
+          </button>
 
           <textarea
             ref={textareaRef}

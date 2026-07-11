@@ -7,10 +7,12 @@ The Vite dev server proxies /chat, /speak, and /transcribe here."""
 import logging
 from typing import Literal, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel
 
+import eleven_client
 import gemini_client
 from config import LANGUAGES, PERSONAS
 
@@ -42,9 +44,16 @@ class ChatRequest(BaseModel):
     history: list[HistoryTurn] = []
 
 
+class Source(BaseModel):
+    title: str
+    url: str
+
+
 class ChatResponse(BaseModel):
     text: str
     intensity: Literal["calm", "building", "explosive"] = "calm"
+    # web sources from Google Search grounding; empty for ungrounded answers
+    sources: list[Source] = []
 
 
 @app.get("/health")
@@ -66,4 +75,61 @@ def chat(req: ChatRequest) -> ChatResponse:
         # the frontend shows its own fallback message on any non-2xx
         logger.exception("Gemini call failed")
         raise HTTPException(status_code=502, detail="Gemini call failed")
-    return ChatResponse(text=reply["text"], intensity=reply["intensity"])
+    return ChatResponse(
+        text=reply["text"],
+        intensity=reply["intensity"],
+        sources=reply.get("sources", []),
+    )
+
+
+class SpeakRequest(BaseModel):
+    text: str
+    voice_style: Literal["calm", "building", "explosive"] = "calm"
+    language: Literal[*LANGUAGES] = "en"  # accepted for future use; the
+    # multilingual model detects the language from the text itself
+
+
+@app.post("/speak")
+def speak(req: SpeakRequest) -> Response:
+    try:
+        audio = eleven_client.tts(req.text, req.voice_style)
+    except Exception:
+        logger.exception("ElevenLabs call failed")
+        raise HTTPException(status_code=502, detail="TTS call failed")
+    return Response(content=audio, media_type="audio/mpeg")
+
+
+class TranscribeResponse(BaseModel):
+    text: str
+
+
+class HypeRequest(BaseModel):
+    team: str
+    mode: Literal["preview", "trash-talk"]
+    language: Literal[*LANGUAGES] = "en"
+
+
+@app.post("/hype")
+def hype(req: HypeRequest) -> ChatResponse:
+    try:
+        reply = gemini_client.generate_hype(req.team, req.mode, req.language)
+    except Exception:
+        logger.exception("Hype generation failed")
+        raise HTTPException(status_code=502, detail="Hype generation failed")
+    return ChatResponse(
+        text=reply["text"],
+        intensity=reply["intensity"],
+        sources=reply.get("sources", []),
+    )
+
+
+@app.post("/transcribe")
+async def transcribe(audio: UploadFile = File(...)) -> TranscribeResponse:
+    try:
+        text = eleven_client.stt(
+            await audio.read(), audio.content_type or "audio/webm"
+        )
+    except Exception:
+        logger.exception("Scribe call failed")
+        raise HTTPException(status_code=502, detail="STT call failed")
+    return TranscribeResponse(text=text)

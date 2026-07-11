@@ -3,12 +3,17 @@
 Gemini integration covers F1–F4 (see PRD, Key technical decisions)."""
 
 import base64
-import json
+import re
 
 from google import genai
 from google.genai import types
 
-from config import GEMINI_CHAT_MODEL, GEMINI_VISION_MODEL, get_key
+from config import (
+    GEMINI_CHAT_MODEL,
+    GEMINI_HYPE_MODEL,
+    GEMINI_VISION_MODEL,
+    get_key,
+)
 
 _client: genai.Client | None = None
 
@@ -61,6 +66,24 @@ INTENSITY_RULE = (
     "drama)."
 )
 
+GROUNDING_RULE = (
+    "You have access to Google Search. Use it whenever the answer depends on "
+    "live or recent tournament data — fixtures, results, standings, squads, "
+    "injuries, 'next opponent' reasoning — even if the user doesn't mention a "
+    "date. Never guess or invent real-world match facts: if the question "
+    "needs current data, search. Timeless questions (rules, general tactics) "
+    "don't need search."
+)
+
+# Intensity rides on a tag line we parse off, not structured output:
+# combining response_schema with the google_search tool makes the API drop
+# grounding chunks inconsistently, and the sources are demo-critical (F4).
+INTENSITY_TAG_RULE = (
+    "Begin your reply with a line containing exactly "
+    "'INTENSITY: calm', 'INTENSITY: building', or 'INTENSITY: explosive', "
+    "then the answer on the following lines."
+)
+
 
 def build_system_prompt(persona: str, language: str) -> str:
     return "\n\n".join(
@@ -73,23 +96,13 @@ def build_system_prompt(persona: str, language: str) -> str:
             f"Respond natively in {LANGUAGE_NAMES[language]} — do not "
             "translate from English; write directly in that language with "
             "natural, correct soccer terminology.",
+            GROUNDING_RULE,
             INTENSITY_RULE,
             "If the user references earlier context (their team, their "
             "level), carry it forward naturally.",
+            INTENSITY_TAG_RULE,
         ]
     )
-
-
-RESPONSE_SCHEMA = types.Schema(
-    type=types.Type.OBJECT,
-    properties={
-        "text": types.Schema(type=types.Type.STRING),
-        "intensity": types.Schema(
-            type=types.Type.STRING, enum=["calm", "building", "explosive"]
-        ),
-    },
-    required=["text", "intensity"],
-)
 
 
 def _data_url_to_part(data_url: str) -> types.Part:
@@ -99,6 +112,26 @@ def _data_url_to_part(data_url: str) -> types.Part:
     return types.Part.from_bytes(data=base64.b64decode(b64), mime_type=mime)
 
 
+def _extract_sources(response) -> list[dict]:
+    """Pull deduplicated web sources out of the grounding metadata. Empty
+    when the model answered without searching."""
+    sources: list[dict] = []
+    seen: set[str] = set()
+    for candidate in response.candidates or []:
+        gm = getattr(candidate, "grounding_metadata", None)
+        for chunk in (gm.grounding_chunks if gm and gm.grounding_chunks else []):
+            web = getattr(chunk, "web", None)
+            if web and web.uri and web.uri not in seen:
+                seen.add(web.uri)
+                sources.append({"title": web.title or web.uri, "url": web.uri})
+    return sources
+
+
+INTENSITY_TAG_RE = re.compile(
+    r"^\s*INTENSITY:\s*(calm|building|explosive)\s*\n?", re.IGNORECASE
+)
+
+
 def generate_reply(
     message: str,
     persona: str,
@@ -106,8 +139,9 @@ def generate_reply(
     image: str | None,
     history: list[dict],
 ) -> dict:
-    """Returns {"text": str, "intensity": str}. Raises on API failure —
-    main.py maps that to an HTTP error the frontend already handles."""
+    """Returns {"text": str, "intensity": str, "sources": [{title, url}]}.
+    Raises on API failure — main.py maps that to an HTTP error the frontend
+    already handles."""
     contents: list[types.Content] = [
         types.Content(
             role="user" if turn["role"] == "user" else "model",
@@ -127,13 +161,72 @@ def generate_reply(
     # latency (PRD resolved decision).
     model = GEMINI_VISION_MODEL if image else GEMINI_CHAT_MODEL
 
+    # Search grounding is exposed on every call — Gemini decides autonomously
+    # when a question needs live data (PRD F4: the model is the router).
     response = client().models.generate_content(
         model=model,
         contents=contents,
         config=types.GenerateContentConfig(
             system_instruction=build_system_prompt(persona, language),
-            response_mime_type="application/json",
-            response_schema=RESPONSE_SCHEMA,
+            tools=[types.Tool(google_search=types.GoogleSearch())],
         ),
     )
-    return json.loads(response.text)
+
+    text = response.text or ""
+    match = INTENSITY_TAG_RE.match(text)
+    return {
+        "text": INTENSITY_TAG_RE.sub("", text, count=1).strip(),
+        "intensity": match.group(1).lower() if match else "calm",
+        "sources": _extract_sources(response),
+    }
+
+
+HYPE_MODES = {
+    "preview": (
+        "Write a dramatic, stadium-announcer match/tournament preview for "
+        "{team}. Build anticipation like the opening of a World Cup final "
+        "broadcast."
+    ),
+    "trash-talk": (
+        "Write a playful, group-chat-ready trash-talk message from a {team} "
+        "fan to their friends. Cocky, funny, meme-adjacent — but good-natured "
+        "and clean; no insults about nationality, race, or anything personal."
+    ),
+}
+
+
+def generate_hype(team: str, mode: str, language: str) -> dict:
+    """F9: one-tap hype content. Grounded in the team's real current
+    tournament situation so the drama references actual results."""
+    system = "\n\n".join(
+        [
+            "You are FootyIQ's hype engine: a dramatic soccer commentator and "
+            "banter writer covering the 2026 FIFA World Cup.",
+            HYPE_MODES[mode].format(team=team),
+            "Use Google Search first to get the team's actual current "
+            "tournament situation (latest result, next fixture, star "
+            "players, whether they are still in it) and weave real facts "
+            "into the drama. If they've been eliminated, lean into "
+            "nostalgia or next-time bravado instead of pretending.",
+            f"Write natively in {LANGUAGE_NAMES[language]}.",
+            "Keep it under 120 words so it can be read aloud in about 40 "
+            "seconds.",
+            INTENSITY_RULE,
+            INTENSITY_TAG_RULE,
+        ]
+    )
+    response = client().models.generate_content(
+        model=GEMINI_HYPE_MODEL,
+        contents=f"Hype me up about {team}!",
+        config=types.GenerateContentConfig(
+            system_instruction=system,
+            tools=[types.Tool(google_search=types.GoogleSearch())],
+        ),
+    )
+    text = response.text or ""
+    match = INTENSITY_TAG_RE.match(text)
+    return {
+        "text": INTENSITY_TAG_RE.sub("", text, count=1).strip(),
+        "intensity": match.group(1).lower() if match else "explosive",
+        "sources": _extract_sources(response),
+    }
