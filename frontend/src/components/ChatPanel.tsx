@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ImagePlus, SendHorizonal, X } from "lucide-react";
 import type { Language, Persona, PipelineState, Message } from "@/lib/types";
+import { SUGGESTED_PROMPTS } from "@/lib/types";
 import MessageBubble from "@/components/MessageBubble";
 import PersonaPicker from "@/components/PersonaPicker";
 
@@ -94,7 +95,7 @@ export default function ChatPanel({
       {!isActive ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-8 px-4">
           <div className="text-center">
-            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">
+            <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
               FootyIQ
             </h1>
             <p className="mt-2 text-sm sm:text-base text-muted">
@@ -107,6 +108,17 @@ export default function ChatPanel({
             onPersonaChange={onPersonaChange}
             onLanguageChange={onLanguageChange}
           />
+          <div className="flex flex-wrap justify-center gap-2 max-w-xl">
+            {SUGGESTED_PROMPTS[language].map((prompt) => (
+              <button
+                key={prompt}
+                onClick={() => onSend(prompt)}
+                className="px-4 h-9 rounded-full border border-border bg-surface/80 text-xs text-muted hover:text-primary hover:border-accent/40 transition-colors"
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
         </div>
       ) : (
         <div

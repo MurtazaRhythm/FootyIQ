@@ -106,5 +106,11 @@ export function useChat(persona: Persona, language: Language) {
     [persona, language],
   );
 
-  return { messages, pipelineState, sendMessage };
+  // wipe the session and return to the landing state
+  const resetChat = useCallback(() => {
+    clearPipeline();
+    setMessages([]);
+  }, []);
+
+  return { messages, pipelineState, sendMessage, resetChat };
 }

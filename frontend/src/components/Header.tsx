@@ -7,6 +7,7 @@ interface HeaderProps {
   language: Language;
   onPersonaChange: (p: Persona) => void;
   onLanguageChange: (l: Language) => void;
+  onHomeClick: () => void;
 }
 
 export default function Header({
@@ -15,13 +16,22 @@ export default function Header({
   language,
   onPersonaChange,
   onLanguageChange,
+  onHomeClick,
 }: HeaderProps) {
   return (
     <header className="fixed top-0 inset-x-0 z-20 h-14 flex items-center justify-between px-4 border-b border-border bg-bg/60 backdrop-blur-md">
-      <div className="flex items-center gap-2">
+      {/* during a chat the logo doubles as a home button (confirmed in App) */}
+      <button
+        onClick={onHomeClick}
+        disabled={!isActive}
+        className={`flex items-center gap-2 ${
+          isActive ? "cursor-pointer hover:opacity-80 transition-opacity" : "cursor-default"
+        }`}
+        aria-label={isActive ? "Back to home" : "FootyIQ"}
+      >
         <span className="w-2 h-2 rounded-full bg-accent" />
         <span className="text-base font-semibold tracking-tight">FootyIQ</span>
-      </div>
+      </button>
 
       {/* persona and language collapse into compact header chips after first message */}
       {isActive && (
