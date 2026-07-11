@@ -61,7 +61,7 @@ export default function ConfirmDialog({
           <button
             ref={confirmRef}
             onClick={onConfirm}
-            className="h-9 px-4 rounded-sm bg-accent text-sm font-medium text-black hover:opacity-90 transition-opacity"
+            className="h-9 px-4 rounded-sm bg-accent text-sm font-medium text-white hover:opacity-90 transition-opacity"
           >
             {confirmLabel}
           </button>

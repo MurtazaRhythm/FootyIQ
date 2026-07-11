@@ -5,18 +5,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: "#0A0A0B",
-        surface: "#131316",
-        border: "#232326",
-        primary: "#FAFAFA",
-        muted: "#8B8B93",
-        accent: "#00E58C",
+        // rgb triplets live in index.css so light mode can override them
+        bg: "rgb(var(--bg) / <alpha-value>)",
+        surface: "rgb(var(--surface) / <alpha-value>)",
+        border: "rgb(var(--border) / <alpha-value>)",
+        primary: "rgb(var(--primary) / <alpha-value>)",
+        muted: "rgb(var(--muted) / <alpha-value>)",
+        accent: "rgb(var(--accent) / <alpha-value>)",
         calm: "#4B9BFF",
         building: "#FFC24B",
-        explosive: "#00E58C",
+        explosive: "#6366F1",
       },
       fontFamily: {
-        sans: ["Geist", "system-ui", "sans-serif"],
+        sans: ["Inter", "system-ui", "sans-serif"],
         mono: ["'JetBrains Mono'", "monospace"],
       },
       fontSize: {

@@ -22,6 +22,11 @@ interface NeuralBackgroundProps {
    * Speed multiplier. Default: 1
    */
   speed?: number;
+  /**
+   * Background as an "r, g, b" triplet, used for the canvas fill and the
+   * trail fade. Default: "0, 0, 0" (dark mode).
+   */
+  backgroundRgb?: string;
 }
 
 export default function NeuralBackground({
@@ -30,6 +35,7 @@ export default function NeuralBackground({
   trailOpacity = 0.15,
   particleCount = 600,
   speed = 1,
+  backgroundRgb = "0, 0, 0",
 }: NeuralBackgroundProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -148,7 +154,7 @@ export default function NeuralBackground({
       // This creates the "Trails" look.
       // We use the background color of the parent or a dark overlay.
       // Assuming dark mode for this effect usually:
-      ctx.fillStyle = `rgba(0, 0, 0, ${trailOpacity})`;
+      ctx.fillStyle = `rgba(${backgroundRgb}, ${trailOpacity})`;
       ctx.fillRect(0, 0, width, height);
 
       particles.forEach((p) => {
@@ -194,12 +200,13 @@ export default function NeuralBackground({
       document.documentElement.removeEventListener("mouseleave", handleMouseLeave);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [color, trailOpacity, particleCount, speed]);
+  }, [color, trailOpacity, particleCount, speed, backgroundRgb]);
 
   return (
     <div
       ref={containerRef}
-      className={cn("relative w-full h-full bg-black overflow-hidden", className)}
+      className={cn("relative w-full h-full overflow-hidden", className)}
+      style={{ backgroundColor: `rgb(${backgroundRgb})` }}
     >
       <canvas ref={canvasRef} className="block w-full h-full" />
     </div>

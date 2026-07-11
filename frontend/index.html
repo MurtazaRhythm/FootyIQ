@@ -5,7 +5,13 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0A0A0B" />
-    <title>FootyIQ — Coach in Your Pocket</title>
+    <title>Pitchside — Coach in Your Pocket</title>
+    <script>
+      // apply the saved theme before first paint to avoid a dark flash
+      if (localStorage.getItem("theme") === "light") {
+        document.documentElement.classList.add("light");
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

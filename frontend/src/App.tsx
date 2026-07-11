@@ -5,36 +5,32 @@ import ChatPanel from "@/components/ChatPanel";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useChat } from "@/hooks/useChat";
 import { useWindowSize } from "@/hooks/useWindowSize";
-import type { Language, Persona } from "@/lib/types";
+import type { Language, Persona, Theme } from "@/lib/types";
 
-/** Fades the particle field out on first message, then unmounts it so the
- *  animation loop stops burning frames behind the chat. */
-function LandingBackground({ visible }: { visible: boolean }) {
-  const [mounted, setMounted] = useState(visible);
+/** Landing: full coverage. Chat: dimmed, masked to corners/edges only. */
+function LandingBackground({ visible, theme }: { visible: boolean; theme: Theme }) {
   const { width } = useWindowSize();
-
-  useEffect(() => {
-    if (visible) {
-      setMounted(true);
-      return;
-    }
-    const t = window.setTimeout(() => setMounted(false), 700);
-    return () => window.clearTimeout(t);
-  }, [visible]);
-
-  if (!mounted) return null;
-
-  // keep 60fps on phones
   const particleCount = width < 640 ? 300 : 600;
 
   return (
     <div
-      className={`fixed inset-0 transition-opacity duration-700 ${
-        visible ? "opacity-100" : "opacity-0"
-      }`}
+      className="fixed inset-0 transition-all duration-700"
+      style={{
+        opacity: visible ? 1 : 0.5,
+        maskImage: visible
+          ? "none"
+          : "radial-gradient(ellipse 55% 55% at 50% 50%, transparent 40%, black 100%)",
+        WebkitMaskImage: visible
+          ? "none"
+          : "radial-gradient(ellipse 55% 55% at 50% 50%, transparent 40%, black 100%)",
+      }}
       aria-hidden
     >
-      <NeuralBackground color="#00e58c" particleCount={particleCount} />
+      <NeuralBackground
+        color={theme === "light" ? "#4f46e5" : "#6366f1"}
+        backgroundRgb={theme === "light" ? "246, 246, 248" : "0, 0, 0"}
+        particleCount={particleCount}
+      />
     </div>
   );
 }
@@ -43,6 +39,17 @@ export default function App() {
   const [persona, setPersona] = useState<Persona>("new-fan");
   const [language, setLanguage] = useState<Language>("en");
   const [confirmingHome, setConfirmingHome] = useState(false);
+  const [theme, setTheme] = useState<Theme>(
+    () => (localStorage.getItem("theme") as Theme) ?? "dark",
+  );
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("light", theme === "light");
+    localStorage.setItem("theme", theme);
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute("content", theme === "light" ? "#F6F6F8" : "#0A0A0B");
+  }, [theme]);
   const { messages, pipelineState, sendMessage, resetChat } = useChat(
     persona,
     language,
@@ -57,24 +64,25 @@ export default function App() {
 
   return (
     <div className="fixed inset-0">
-      <LandingBackground visible={!isActive} />
+      <LandingBackground visible={!isActive} theme={theme} />
       <div className="relative h-full">
         <Header
           isActive={isActive}
           persona={persona}
           language={language}
+          theme={theme}
           onPersonaChange={setPersona}
           onLanguageChange={setLanguage}
+          onThemeToggle={() =>
+            setTheme((t) => (t === "dark" ? "light" : "dark"))
+          }
           onHomeClick={() => setConfirmingHome(true)}
         />
         <ChatPanel
           isActive={isActive}
           messages={messages}
           pipelineState={pipelineState}
-          persona={persona}
           language={language}
-          onPersonaChange={setPersona}
-          onLanguageChange={setLanguage}
           onSend={sendMessage}
         />
       </div>
