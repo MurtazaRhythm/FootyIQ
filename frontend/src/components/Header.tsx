@@ -21,9 +21,9 @@ const PERSONA_OPTIONS: DropdownOption<Persona>[] = [
 ];
 
 const LANGUAGE_OPTIONS: DropdownOption<Language>[] = [
-  { id: "en", label: "EN" },
-  { id: "fr", label: "FR" },
-  { id: "es", label: "ES" },
+  { id: "en", label: "English" },
+  { id: "fr", label: "Français" },
+  { id: "es", label: "Español" },
 ];
 
 export default function Header({
@@ -37,7 +37,7 @@ export default function Header({
   onHomeClick,
 }: HeaderProps) {
   return (
-    <header className="fixed top-3 inset-x-3 z-20 flex justify-center pointer-events-none">
+    <header className="fixed top-3 inset-x-3 z-20 flex justify-center pointer-events-none animate-fade-down">
       <nav className="glass-panel glass-panel-glow pointer-events-auto relative flex items-center justify-between gap-3 w-full max-w-3xl h-12 pl-4 pr-2 rounded-lg">
         {/* sweeping sheen, clipped to the panel's rounded corners */}
         <span className="glass-panel-sheen" aria-hidden />

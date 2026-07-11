@@ -3,11 +3,12 @@ export type Language = "en" | "fr" | "es";
 export type Theme = "dark" | "light";
 export type Intensity = "calm" | "building" | "explosive";
 
-export type PipelineState =
-  | "thinking"
-  | "checking live data"
-  | "writing commentary"
-  | "generating audio";
+export type PipelineState = "Thinking" | "Generating";
+
+export interface Source {
+  title: string;
+  url: string;
+}
 
 export interface Message {
   id: string;
@@ -15,6 +16,9 @@ export interface Message {
   text: string;
   image?: string; // data URL for user-attached images
   intensity?: Intensity;
+  sources?: Source[]; // Google Search grounding citations
+  autoSpeak?: boolean; // voice-initiated turns speak their reply
+  persona?: Persona; // persona active when this message was sent
   timestamp: number;
 }
 
@@ -65,7 +69,7 @@ export const SUGGESTED_PROMPTS: Record<Language, string[]> = {
   ],
 };
 
-// composer placeholder sentences, rotated with a fade like the prompt chips
+// composer placeholder sentences, rotated with a fade
 export const COMPOSER_PLACEHOLDERS: Record<Language, string[]> = {
   en: [
     "Ask anything about the match...",
@@ -87,11 +91,53 @@ export const COMPOSER_PLACEHOLDERS: Record<Language, string[]> = {
   ],
 };
 
-// shown in the composer while the mic is on — short phrases, same fade transition
+// shown in the composer while the mic is on
 export const LISTENING_PHRASES: Record<Language, string[]> = {
   en: ["Listening now...", "Go ahead...", "Still listening..."],
   fr: ["J'écoute...", "Vas-y...", "Toujours là..."],
   es: ["Te escucho...", "Adelante...", "Sigo aquí..."],
+};
+
+export type HypeMode = "preview" | "trash-talk";
+
+// user-bubble label shown when hype is requested
+export const HYPE_LABELS: Record<Language, Record<HypeMode, string>> = {
+  en: {
+    preview: "Hype me up about {team}!",
+    "trash-talk": "Give me some trash talk for {team}!",
+  },
+  fr: {
+    preview: "Chauffe-moi à bloc pour {team} !",
+    "trash-talk": "Un petit chambrage pour {team} !",
+  },
+  es: {
+    preview: "¡Dame hype de {team}!",
+    "trash-talk": "¡Dame un pique para {team}!",
+  },
+};
+
+export const HYPE_UI: Record<
+  Language,
+  { placeholder: string; preview: string; trashTalk: string; title: string }
+> = {
+  en: {
+    title: "Hype generator",
+    placeholder: "Team (e.g. Morocco)",
+    preview: "Match preview",
+    trashTalk: "Trash talk",
+  },
+  fr: {
+    title: "Générateur de hype",
+    placeholder: "Équipe (ex. Maroc)",
+    preview: "Avant-match",
+    trashTalk: "Chambrage",
+  },
+  es: {
+    title: "Generador de hype",
+    placeholder: "Equipo (ej. México)",
+    preview: "Previa del partido",
+    trashTalk: "Pique",
+  },
 };
 
 export const INTENSITY_COLORS: Record<Intensity, string> = {

@@ -2,5 +2,4 @@
 local_config.py is gitignored — keys must never be committed.
 Deployed environments use the same names as environment variables instead."""
 
-GEMINI_API_KEY = ""
-ELEVENLABS_API_KEY = ""
+GEMINI_API_KEY = "your-gemini-api-key-here"

@@ -50,7 +50,8 @@ export default function App() {
       .querySelector('meta[name="theme-color"]')
       ?.setAttribute("content", theme === "light" ? "#F6F6F8" : "#0A0A0B");
   }, [theme]);
-  const { messages, pipelineState, sendMessage, resetChat } = useChat(
+
+  const { messages, pipelineState, sendMessage, sendHype, resetChat } = useChat(
     persona,
     language,
   );
@@ -83,7 +84,9 @@ export default function App() {
           messages={messages}
           pipelineState={pipelineState}
           language={language}
+          persona={persona}
           onSend={sendMessage}
+          onHype={sendHype}
         />
       </div>
       <ConfirmDialog

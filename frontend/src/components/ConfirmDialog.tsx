@@ -42,11 +42,11 @@ export default function ConfirmDialog({
       aria-labelledby="confirm-dialog-title"
     >
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
         onClick={onCancel}
         aria-hidden
       />
-      <div className="relative w-full max-w-sm rounded-md border border-border bg-surface p-6 shadow-xl">
+      <div className="relative w-full max-w-sm rounded-md border border-border bg-surface p-6 shadow-xl animate-fade-up">
         <h2 id="confirm-dialog-title" className="text-base font-semibold">
           {title}
         </h2>

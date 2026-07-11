@@ -375,6 +375,74 @@ body {
   animation: mic-ring 1.4s ease-out infinite;
 }
 
+/* text shimmer for pipeline / loading states */
+@keyframes text-shimmer {
+  0% {
+    background-position: 100% center;
+  }
+  100% {
+    background-position: -100% center;
+  }
+}
+
+.text-shimmer {
+  display: inline-block;
+  background-image: linear-gradient(
+    90deg,
+    rgb(var(--muted))   0%,
+    rgb(var(--muted))   30%,
+    rgb(var(--primary)) 50%,
+    rgb(var(--muted))   70%,
+    rgb(var(--muted))   100%
+  );
+  background-size: 200% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: text-shimmer var(--shimmer-duration, 1.8s) linear infinite;
+}
+
+/* page-load and mount entrance animations */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-down {
+  from {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-fade-down {
+  animation: fade-down 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease both;
+}
+
+
 /* thin dark scrollbar for the chat list */
 .chat-scroll::-webkit-scrollbar {
   width: 6px;

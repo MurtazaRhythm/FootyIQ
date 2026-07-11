@@ -1,37 +1,43 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, ImagePlus, Mic, X } from "lucide-react";
-import type { Language, PipelineState, Message } from "@/lib/types";
+import { ArrowUp, ImagePlus, Megaphone, Mic, X } from "lucide-react";
+import type { HypeMode, Language, Persona, PipelineState, Message } from "@/lib/types";
 import {
   COMPOSER_PLACEHOLDERS,
+  HYPE_UI,
   LISTENING_PHRASES,
   SUGGESTED_PROMPTS,
 } from "@/lib/types";
 import MessageBubble from "@/components/MessageBubble";
 import VoiceOrb from "@/components/ui/voice-orb";
+import { TextShimmer } from "@/components/loading-ui/text-shimmer";
 
 interface ChatPanelProps {
   isActive: boolean;
   messages: Message[];
   pipelineState: PipelineState | null;
   language: Language;
-  onSend: (text: string, image?: string) => void;
+  persona: Persona;
+  onSend: (text: string, image?: string, opts?: { voice?: boolean }) => void;
+  onHype: (team: string, mode: HypeMode) => void;
 }
+
+const HYPE_MODE_LABELS: Record<Language, Record<HypeMode, string>> = {
+  en: { "preview": "Match Preview", "trash-talk": "Trash Talk" },
+  fr: { "preview": "Avant-match",   "trash-talk": "Chambrage"  },
+  es: { "preview": "Previa",        "trash-talk": "Pique"      },
+};
 
 function PipelineIndicator({ state }: { state: PipelineState }) {
   return (
-    <div className="flex items-center gap-2.5 pl-0.5">
-      <div className="flex gap-1" aria-hidden>
-        <span className="pulse-dot w-1 h-1 rounded-full bg-muted" />
-        <span
-          className="pulse-dot w-1 h-1 rounded-full bg-muted"
-          style={{ animationDelay: "0.2s" }}
-        />
-        <span
-          className="pulse-dot w-1 h-1 rounded-full bg-muted"
-          style={{ animationDelay: "0.4s" }}
-        />
-      </div>
-      <span className="text-xs text-muted">{state}</span>
+    <div className="flex items-center gap-1.5 pl-0.5">
+      <TextShimmer className="text-sm font-medium" duration={1.6}>
+        {state}
+      </TextShimmer>
+      <span className="flex items-center gap-[3px] mb-[1px]" aria-hidden>
+        <span className="pulse-dot w-[3px] h-[3px] rounded-full bg-muted" />
+        <span className="pulse-dot w-[3px] h-[3px] rounded-full bg-muted" style={{ animationDelay: "0.2s" }} />
+        <span className="pulse-dot w-[3px] h-[3px] rounded-full bg-muted" style={{ animationDelay: "0.4s" }} />
+      </span>
     </div>
   );
 }
@@ -41,10 +47,13 @@ export default function ChatPanel({
   messages,
   pipelineState,
   language,
+  persona,
   onSend,
+  onHype,
 }: ChatPanelProps) {
   const [draft, setDraft] = useState("");
   const [image, setImage] = useState<string | null>(null);
+  const [hypeMode, setHypeMode] = useState<HypeMode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -75,7 +84,7 @@ export default function ChatPanel({
 
   const visiblePrompts = prompts.slice(
     promptPage * PROMPTS_PER_PAGE,
-    promptPage * PROMPTS_PER_PAGE + PROMPTS_PER_PAGE
+    promptPage * PROMPTS_PER_PAGE + PROMPTS_PER_PAGE,
   );
 
   // mic state lives up here because the placeholder rotation depends on it
@@ -115,19 +124,44 @@ export default function ChatPanel({
     });
   }, [messages, pipelineState]);
 
+  // downscale to <=1280px on the long edge before upload to reduce payload size
   const handleFile = (file: File) => {
     const reader = new FileReader();
-    reader.onload = () => setImage(reader.result as string);
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const MAX_EDGE = 1280;
+        const scale = Math.min(1, MAX_EDGE / Math.max(img.width, img.height));
+        if (scale === 1) {
+          setImage(dataUrl);
+          return;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext("2d")?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        setImage(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.src = dataUrl;
+    };
     reader.readAsDataURL(file);
   };
 
   const send = () => {
     const text = draft.trim();
+    if (hypeMode) {
+      if (!text) return;
+      onHype(text, hypeMode);
+      setHypeMode(null);
+      setDraft("");
+      if (textareaRef.current) textareaRef.current.style.height = "auto";
+      return;
+    }
     if (!text && !image) return;
-    // kill any in-flight dictation so it can't resurrect the cleared draft
     recognitionRef.current?.abort();
+    onSend(text, image ?? undefined, listening ? { voice: true } : undefined);
     setListening(false);
-    onSend(text, image ?? undefined);
     setDraft("");
     setImage(null);
     if (textareaRef.current) textareaRef.current.style.height = "auto";
@@ -147,7 +181,7 @@ export default function ChatPanel({
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
   };
 
-  // voice mode: coach replies are spoken aloud automatically (ElevenLabs /speak)
+  // voice mode: coach replies are spoken aloud automatically
   const [voiceMode, setVoiceMode] = useState(
     () => localStorage.getItem("voiceMode") === "1",
   );
@@ -163,7 +197,7 @@ export default function ChatPanel({
     .reverse()
     .find((m) => m.role === "coach")?.id;
 
-  // voice dictation via the Web Speech API, like the ChatGPT mic button
+  // voice dictation via the Web Speech API
   const SpeechRecognitionImpl =
     window.SpeechRecognition ?? window.webkitSpeechRecognition;
 
@@ -214,8 +248,8 @@ export default function ChatPanel({
   const resolvedOrbState = pipelineState
     ? "processing"
     : audioPlaying
-    ? "speaking"
-    : "idle";
+      ? "speaking"
+      : "idle";
 
   // show orb when voice mode is on OR audio is actively playing
   const showOrb = (voiceMode || audioPlaying) && !orbDismissed;
@@ -226,7 +260,7 @@ export default function ChatPanel({
   };
 
   const composer = (
-    <div className="glass-panel rounded-xl">
+    <div className="relative glass-panel rounded-xl">
       {image && (
         <div className="px-3 pt-3">
           <div className="relative inline-block">
@@ -253,13 +287,13 @@ export default function ChatPanel({
             className={`pointer-events-none absolute left-4 top-3.5 text-sm leading-relaxed transition-all duration-300 ease-out ${
               listening ? "text-red-400" : "text-muted"
             } ${
-              placeholderVisible
+              hypeMode || placeholderVisible
                 ? "opacity-100 translate-y-0"
                 : "opacity-0 translate-y-1"
             }`}
             aria-hidden
           >
-            {placeholderText}
+            {hypeMode ? HYPE_UI[language].placeholder : placeholderText}
           </span>
         )}
         <textarea
@@ -276,13 +310,30 @@ export default function ChatPanel({
 
       <div className="flex items-center justify-between px-2.5 pb-2.5">
         <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary/5 hover:text-primary"
-            aria-label="Attach image"
-          >
-            <ImagePlus size={16} />
-          </button>
+          {hypeMode ? (
+            /* mode pills inline in the toolbar when hype is active */
+            <div className="flex items-center gap-1 p-0.5 rounded-lg border border-border bg-primary/[0.03]">
+              {(["preview", "trash-talk"] as HypeMode[]).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setHypeMode(m)}
+                  className={`px-2.5 h-6 rounded-md text-[11px] font-medium transition-all ${
+                    hypeMode === m ? "bg-accent text-bg" : "text-muted hover:text-primary"
+                  }`}
+                >
+                  {HYPE_MODE_LABELS[language][m]}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary/5 hover:text-primary"
+              aria-label="Attach image"
+            >
+              <ImagePlus size={16} />
+            </button>
+          )}
         </div>
         <input
           ref={fileInputRef}
@@ -297,7 +348,22 @@ export default function ChatPanel({
         />
 
         <div className="flex items-center gap-1.5">
-          {/* voice mode */}
+          {/* hype generator toggle */}
+          <button
+            onClick={() => setHypeMode((m) => m === null ? "preview" : null)}
+            className={
+              hypeMode
+                ? "flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-accent transition-colors"
+                : "flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary/5 hover:text-primary"
+            }
+            aria-label="Hype generator"
+            aria-pressed={hypeMode !== null}
+            title="Hype generator"
+          >
+            <Megaphone size={16} />
+          </button>
+
+          {/* voice mode toggle */}
           <button
             onClick={toggleVoiceMode}
             className={
@@ -366,7 +432,7 @@ export default function ChatPanel({
       {!isActive ? (
         /* landing: hero, suggested prompts, composer directly below them */
         <div className="flex-1 flex flex-col items-center justify-center gap-8 px-4">
-          <div className="text-center">
+          <div className="text-center animate-fade-up" style={{ animationDelay: "0.05s" }}>
             <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
               Pitchside
             </h1>
@@ -376,11 +442,12 @@ export default function ChatPanel({
           </div>
 
           <div
-            className={`flex flex-wrap justify-center gap-2 max-w-xl transition-all duration-500 ease-out ${
+            className={`flex flex-wrap justify-center gap-2 max-w-xl transition-all duration-500 ease-out animate-fade-up ${
               promptsVisible
                 ? "opacity-100 translate-y-0"
                 : "opacity-0 translate-y-1.5"
             }`}
+            style={{ animationDelay: "0.15s" }}
           >
             {visiblePrompts.map((prompt) => (
               <button
@@ -393,7 +460,7 @@ export default function ChatPanel({
             ))}
           </div>
 
-          <div className="w-full max-w-xl">{composer}</div>
+          <div className="w-full max-w-xl animate-fade-up" style={{ animationDelay: "0.25s" }}>{composer}</div>
         </div>
       ) : (
         <>
@@ -401,13 +468,16 @@ export default function ChatPanel({
             ref={scrollRef}
             className="chat-scroll flex-1 overflow-y-auto px-4 py-8"
           >
-            <div className="max-w-2xl mx-auto flex flex-col gap-7">
+            <div aria-live="polite" className="max-w-2xl mx-auto flex flex-col gap-7">
               {messages.map((m) => (
                 <MessageBubble
                   key={m.id}
                   message={m}
                   language={language}
-                  autoPlayAudio={voiceMode && m.id === latestCoachId}
+                  persona={persona}
+                  autoPlayAudio={
+                    (voiceMode || !!m.autoSpeak) && m.id === latestCoachId
+                  }
                   onAudioPlaying={setAudioPlaying}
                 />
               ))}

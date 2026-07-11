@@ -63,8 +63,12 @@ INTENSITY_RULE = (
 
 
 def build_system_prompt(persona: str, language: str) -> str:
+    lang = LANGUAGE_NAMES[language]
     return "\n\n".join(
         [
+            f"LANGUAGE: You must respond exclusively in {lang}. This overrides "
+            f"everything else. No matter what language previous messages are in, "
+            f"your reply must always be in {lang}. Do not mix languages.",
             "You are FootyIQ, a friendly personal soccer coach helping someone "
             "follow the 2026 FIFA World Cup (hosted by Canada, the USA, and "
             "Mexico). You explain rules, tactics, refereeing decisions, and "
@@ -132,6 +136,53 @@ def generate_reply(
         contents=contents,
         config=types.GenerateContentConfig(
             system_instruction=build_system_prompt(persona, language),
+            response_mime_type="application/json",
+            response_schema=RESPONSE_SCHEMA,
+        ),
+    )
+    return json.loads(response.text)
+
+
+HYPE_MODES = {
+    "preview": (
+        "You are the voice of a World Cup broadcast opener — think the cold "
+        "open before kick-off when the camera sweeps the stadium and the "
+        "crowd is electric. Write a match/tournament preview for {team} that "
+        "feels like it belongs on prime-time TV: start with a vivid one-line "
+        "hook (a moment, a stat, a storyline), build through the team's "
+        "journey, name the star player who will carry them, and end on a "
+        "single soaring sentence about what is at stake tonight. Punchy, "
+        "cinematic, no filler. 3–4 short paragraphs maximum."
+    ),
+    "trash-talk": (
+        "You are a {team} superfan firing up a group chat before the match. "
+        "Write trash talk that is funny, cocky, and meme-worthy — the kind "
+        "of message that gets 20 laughing-crying reactions. Reference a real "
+        "recent result or rival moment to make it land harder. Use short "
+        "punchy sentences, maybe a rhetorical question or two, and end with "
+        "an unapologetic closer. Good-natured only — no insults about "
+        "nationality, race, or anything personal. 60–90 words."
+    ),
+}
+
+
+def generate_hype(team: str, mode: str, language: str) -> dict:
+    """F9: one-tap hype content."""
+    system = "\n\n".join(
+        [
+            f"LANGUAGE: You must respond exclusively in {LANGUAGE_NAMES[language]}. "
+            f"This overrides everything else.",
+            "You are FootyIQ's hype engine covering the 2026 FIFA World Cup "
+            "(hosted by Canada, USA, and Mexico).",
+            HYPE_MODES[mode].format(team=team),
+            INTENSITY_RULE,
+        ]
+    )
+    response = client().models.generate_content(
+        model=GEMINI_CHAT_MODEL,
+        contents=f"Generate hype content for {team} at the 2026 World Cup.",
+        config=types.GenerateContentConfig(
+            system_instruction=system,
             response_mime_type="application/json",
             response_schema=RESPONSE_SCHEMA,
         ),
