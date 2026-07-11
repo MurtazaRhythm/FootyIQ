@@ -50,8 +50,11 @@ The 2026 World Cup — hosted by Canada, the US, and Mexico — is pulling in mi
 ### P0 — Core (must ship)
 
 **F1. Persona-based explanations**
-User selects a knowledge level: *Never watched* → *Play FIFA sometimes* → *Tactics nerd*. The level is injected into the Gemini system prompt and adapts vocabulary, depth, and analogies of every answer.
-- *Acceptance:* the same question ("why was that offside?") produces three visibly different answers across the three levels.
+User selects a knowledge level: *Never watched* → *Play FIFA sometimes* → *Tactics nerd*. The level is injected into the Gemini system prompt and produces structurally different answers — not just simpler or fancier wording of the same content:
+- **New Fan** receives an analogy-based explanation that maps the concept to everyday life (e.g., offside explained as a "being behind the last defender is like cutting in line at the wrong moment").
+- **Casual** receives a short tactical note that names what happened and why it matters for the game-plan, without deep stats.
+- **Tactics Nerd** receives an answer that references an actual stat or analytical concept (xG, pressing intensity, defensive line height, etc.) relevant to the moment being explained.
+- *Acceptance:* the same question ("why was that goal disallowed for offside?") produces three answers that differ in **structure** — one is analogy-led, one is tactical-note format, one cites a measurable concept — not merely in vocabulary complexity.
 
 **F2. Multilingual mode**
 User selects English, French, or Spanish; all responses are generated in that language natively by Gemini (not post-translated).
@@ -64,16 +67,22 @@ User pastes a headline/match report or uploads a screenshot (e.g., a freeze-fram
 ### P1 — Differentiators (should ship)
 
 **F4. Live context via Google Search grounding**
-The Gemini call attaches the Google Search grounding tool so questions like "who does England play next?" or "what were yesterday's results?" return current, cited data instead of hallucinations.
-- *Acceptance:* a live fixture question returns the correct, verifiable current answer with grounding metadata.
+The Gemini call exposes the Google Search grounding tool as a callable function. Gemini decides autonomously — via tool/function calling — when a query requires live data and invokes search accordingly. There is no keyword matching on the client or backend side; the model determines whether grounding is needed based on the question's intent.
+- *Acceptance:* (a) a simple live-data lookup ("who do they play next?") returns the correct, verifiable current answer with grounding metadata; (b) a reasoning question that requires grounded data ("should we be worried about the next opponent?") also triggers grounding and produces an answer that reasons over the retrieved context, not just quotes it.
+- *Demo/test question set must include at least one of each type.*
 
 **F5. Commentator voice output (ElevenLabs TTS)**
-Any answer can be played aloud. Gemini writes a commentary-style script; ElevenLabs performs it in a selectable stock voice style: *Hype commentator*, *Calm analyst*, or *Your friend who knows ball*.
-- *Acceptance:* one-tap playback of a dramatic spoken explanation, < 4 s to first audio for cached lines.
+Any answer can be played aloud. Gemini writes a commentary-style script and tags each line with an emotional intensity level — *calm*, *building*, or *explosive* — based on what is happening in the moment being described. Those tags drive the ElevenLabs call: each intensity level maps to distinct voice `style` and `stability` settings rather than a single flat delivery. A goal-mouth scramble line is delivered differently from a tactical explanation.
+- *Acceptance:* one-tap playback of a dramatic spoken explanation, < 4 s to first audio for cached lines; a multi-line response audibly shifts in delivery across intensity levels.
 
 **F6. Multilingual audio**
 ElevenLabs' multilingual model speaks the French and Spanish responses naturally.
 - *Acceptance:* a French text answer plays back in fluent French audio.
+
+**F10. In-session memory**
+No accounts or persistence — session only. If the user mentions a team preference, language preference, or any other meaningful context earlier in the conversation, the app carries that forward and references it naturally in later responses (e.g., if the user says "I'm supporting Morocco" early on, a later unprompted question gets a Morocco-aware answer without the user repeating themselves).
+- *Acceptance:* a stated team preference in message 1 is correctly referenced in a relevant response three or more turns later, without the user repeating it.
+- *Technical note:* this reuses the existing `history` param already being passed to `/chat` — no new database or infrastructure is needed. If more reliability is wanted, an in-memory dict on the FastAPI backend keyed by session id can hold a small set of structured fields (e.g., `team`, `language`, `level`) that are injected into the system prompt on each turn.
 
 ### P2 — Stretch goals
 
@@ -147,7 +156,7 @@ worldcup-companion/
 
 ### Key technical decisions
 - **System prompt as the personalization engine.** Persona + language are prompt parameters, not separate models — one Gemini integration covers F1–F4.
-- **Grounding attached conditionally.** Enabled when the query looks time-sensitive (fixtures, scores, "next", "today"), keeping latency low for rule explanations.
+- **Grounding via model-driven tool calling.** The Google Search grounding tool is exposed as a callable function; Gemini decides autonomously whether to invoke it based on the question's intent. No keyword matching (e.g., "today", "next") on the client or backend — the model is the router. This keeps latency low for rule explanations while correctly handling implicit live-data needs (e.g., "should we be worried about the next opponent?" triggers grounding without containing any time-keywords).
 - **Audio caching.** MP3s keyed by hash(text, voice) and stored on disk. Rehearsed demo lines play instantly, protecting both latency and the ElevenLabs free-tier character quota.
 - **Stock voices only.** No cloning of real commentators; dramatic *writing style* comes from Gemini, not from imitating a person.
 
