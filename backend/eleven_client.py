@@ -4,6 +4,7 @@ and repeats don't burn the character quota (PRD, Key technical decisions)."""
 
 import hashlib
 import json
+import time
 from pathlib import Path
 
 import httpx
@@ -48,17 +49,28 @@ def tts(text: str, intensity: str) -> bytes:
     if path.exists():
         return path.read_bytes()
 
-    response = httpx.post(
-        TTS_URL.format(voice_id=ELEVEN_VOICE_ID),
-        headers={"xi-api-key": _api_key()},
-        json={
-            "text": text,
-            "model_id": ELEVEN_MODEL,
-            "voice_settings": ELEVEN_VOICE_SETTINGS[intensity],
-        },
-        timeout=60,
-    )
-    response.raise_for_status()
+    # one retry: a transient ElevenLabs 429/5xx shouldn't kill a demo playback
+    for attempt in range(2):
+        response = httpx.post(
+            TTS_URL.format(voice_id=ELEVEN_VOICE_ID),
+            headers={"xi-api-key": _api_key()},
+            json={
+                "text": text,
+                "model_id": ELEVEN_MODEL,
+                "voice_settings": ELEVEN_VOICE_SETTINGS[intensity],
+            },
+            timeout=60,
+        )
+        if response.status_code < 500 and response.status_code != 429:
+            break
+        if attempt == 0:
+            time.sleep(1)
+    if response.status_code >= 400:
+        # surface the body: ElevenLabs puts the real reason there (e.g.
+        # quota_exceeded arrives as a 401, not a 429)
+        raise RuntimeError(
+            f"ElevenLabs TTS {response.status_code}: {response.text[:300]}"
+        )
 
     CACHE_DIR.mkdir(exist_ok=True)
     path.write_bytes(response.content)
@@ -75,5 +87,8 @@ def stt(audio: bytes, mime_type: str) -> str:
         files={"file": ("question", audio, mime_type)},
         timeout=120,
     )
-    response.raise_for_status()
+    if response.status_code >= 400:
+        raise RuntimeError(
+            f"ElevenLabs STT {response.status_code}: {response.text[:300]}"
+        )
     return response.json().get("text", "").strip()

@@ -85,16 +85,24 @@ function HypePopover({
   );
 }
 
-type MicState = "idle" | "recording" | "transcribing" | "error";
+type MicState = "idle" | "recording" | "transcribing";
+
+/** Scribe annotates non-speech as bracketed tags, e.g. "(percussive sound
+ *  effects)" or "(silence)" — strip them so noise isn't sent as a question. */
+function cleanTranscript(text: string) {
+  return text.replace(/[([][^)\]]*[)\]]/g, "").trim();
+}
 
 /** Tap to record, tap again to stop: the clip goes to /transcribe (Scribe)
  *  and the transcript is sent as a voice question, whose reply auto-plays —
  *  the full hands-free loop (F8). */
 function MicButton({ onTranscript }: { onTranscript: (text: string) => void }) {
   const [state, setState] = useState<MicState>("idle");
+  const [error, setError] = useState<string | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
 
   const start = async () => {
+    setError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
@@ -114,17 +122,22 @@ function MicButton({ onTranscript }: { onTranscript: (text: string) => void }) {
           if (!res.ok) throw new Error(`transcribe failed: ${res.status}`);
           const data: { text: string } = await res.json();
           setState("idle");
-          if (data.text) onTranscript(data.text);
+          const text = cleanTranscript(data.text);
+          if (text) {
+            onTranscript(text);
+          } else {
+            setError("Didn't catch that — tap to retry");
+          }
         } catch {
-          setState("error");
+          setState("idle");
+          setError("Transcription failed — tap to retry");
         }
       };
       recorderRef.current = recorder;
       recorder.start();
       setState("recording");
     } catch {
-      // mic permission denied or no input device
-      setState("error");
+      setError("Mic blocked — allow microphone access and retry");
     }
   };
 
@@ -152,16 +165,27 @@ function MicButton({ onTranscript }: { onTranscript: (text: string) => void }) {
   }
 
   return (
-    <button
-      onClick={start}
-      className={`shrink-0 w-11 h-11 flex items-center justify-center rounded-sm border border-border bg-surface transition-colors ${
-        state === "error" ? "text-red-400" : "text-muted hover:text-primary"
-      }`}
-      aria-label={state === "error" ? "Voice input failed, retry" : "Ask by voice"}
-      title={state === "error" ? "Voice input failed — tap to retry" : "Ask by voice"}
-    >
-      <Mic size={18} />
-    </button>
+    <div className="relative shrink-0">
+      {error && (
+        <span
+          role="alert"
+          className="absolute bottom-full left-0 mb-2 whitespace-nowrap rounded-sm border border-red-500/40 bg-surface px-2 py-1 text-xs text-red-400"
+        >
+          {error}
+        </span>
+      )}
+      <button
+        onClick={start}
+        className={`w-11 h-11 flex items-center justify-center rounded-sm border bg-surface transition-colors ${
+          error
+            ? "border-red-500/60 text-red-400"
+            : "border-border text-muted hover:text-primary"
+        }`}
+        aria-label={error ? "Voice input failed, retry" : "Ask by voice"}
+      >
+        <Mic size={18} />
+      </button>
+    </div>
   );
 }
 

@@ -1,4 +1,4 @@
-import { ALargeSmall } from "lucide-react";
+import { ALargeSmall, Volume2, VolumeX } from "lucide-react";
 import { PERSONAS, LANGUAGES } from "@/lib/types";
 import type { Language, Persona } from "@/lib/types";
 
@@ -7,9 +7,11 @@ interface HeaderProps {
   persona: Persona;
   language: Language;
   largeText: boolean;
+  voiceReplies: boolean;
   onPersonaChange: (p: Persona) => void;
   onLanguageChange: (l: Language) => void;
   onLargeTextToggle: () => void;
+  onVoiceRepliesToggle: () => void;
   onHomeClick: () => void;
 }
 
@@ -18,9 +20,11 @@ export default function Header({
   persona,
   language,
   largeText,
+  voiceReplies,
   onPersonaChange,
   onLanguageChange,
   onLargeTextToggle,
+  onVoiceRepliesToggle,
   onHomeClick,
 }: HeaderProps) {
   return (
@@ -39,6 +43,19 @@ export default function Header({
       </button>
 
       <div className="flex items-center gap-2 overflow-x-auto">
+        <button
+          onClick={onVoiceRepliesToggle}
+          className={`shrink-0 w-9 h-9 flex items-center justify-center rounded-full border transition-colors ${
+            voiceReplies
+              ? "border-accent/60 bg-accent/10 text-accent"
+              : "border-border bg-surface text-muted hover:text-primary"
+          }`}
+          aria-pressed={voiceReplies}
+          aria-label="Toggle spoken replies"
+          title={voiceReplies ? "Spoken replies: on" : "Spoken replies: off"}
+        >
+          {voiceReplies ? <Volume2 size={18} /> : <VolumeX size={18} />}
+        </button>
         <button
           onClick={onLargeTextToggle}
           className={`shrink-0 w-9 h-9 flex items-center justify-center rounded-full border transition-colors ${

@@ -46,6 +46,9 @@ export default function App() {
   const [language, setLanguage] = useState<Language>("en");
   const [confirmingHome, setConfirmingHome] = useState(false);
   const [largeText, setLargeText] = useState(false);
+  // global auto-speak for replies; off by default to protect TTS quota.
+  // Voice-initiated questions always speak regardless (hands-free loop).
+  const [voiceReplies, setVoiceReplies] = useState(false);
 
   // Tailwind sizes are rem-based, so scaling the root font-size scales the
   // whole UI proportionally (F7 larger-text toggle)
@@ -53,7 +56,7 @@ export default function App() {
     document.documentElement.style.fontSize = largeText ? "20px" : "";
   }, [largeText]);
   const { messages, pipelineState, sendMessage, sendHype, resetChat } =
-    useChat(persona, language);
+    useChat(persona, language, voiceReplies);
 
   const isActive = messages.length > 0;
 
@@ -71,9 +74,11 @@ export default function App() {
           persona={persona}
           language={language}
           largeText={largeText}
+          voiceReplies={voiceReplies}
           onPersonaChange={setPersona}
           onLanguageChange={setLanguage}
           onLargeTextToggle={() => setLargeText((v) => !v)}
+          onVoiceRepliesToggle={() => setVoiceReplies((v) => !v)}
           onHomeClick={() => setConfirmingHome(true)}
         />
         <ChatPanel

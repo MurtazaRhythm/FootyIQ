@@ -26,7 +26,11 @@ const PIPELINE_STEPS: PipelineState[] = [
 let nextId = 0;
 const makeId = () => `msg-${Date.now()}-${nextId++}`;
 
-export function useChat(persona: Persona, language: Language) {
+export function useChat(
+  persona: Persona,
+  language: Language,
+  voiceReplies: boolean,
+) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [pipelineState, setPipelineState] = useState<PipelineState | null>(null);
   const pipelineTimers = useRef<number[]>([]);
@@ -90,8 +94,9 @@ export function useChat(persona: Persona, language: Language) {
             text: data.text,
             intensity: data.intensity ?? "calm",
             sources: data.sources ?? [],
-            // hands-free loop: a spoken question gets a spoken answer
-            autoSpeak: opts?.voice ?? false,
+            // spoken when the global voice toggle is on; voice-initiated
+            // questions always speak (hands-free loop, F8)
+            autoSpeak: voiceReplies || (opts?.voice ?? false),
             timestamp: Date.now(),
           },
         ]);
@@ -110,7 +115,7 @@ export function useChat(persona: Persona, language: Language) {
         clearPipeline();
       }
     },
-    [persona, language],
+    [persona, language, voiceReplies],
   );
 
   // F9: one-tap hype content — appears in the chat like any other exchange
@@ -142,6 +147,7 @@ export function useChat(persona: Persona, language: Language) {
             text: data.text,
             intensity: data.intensity ?? "explosive",
             sources: data.sources ?? [],
+            autoSpeak: voiceReplies,
             timestamp: Date.now(),
           },
         ]);
@@ -160,7 +166,7 @@ export function useChat(persona: Persona, language: Language) {
         clearPipeline();
       }
     },
-    [language],
+    [language, voiceReplies],
   );
 
   // wipe the session and return to the landing state

@@ -62,6 +62,16 @@ Sanity checks if something looks off:
 - If Vite prints "Port 5173 is in use, trying another one…", a stale dev server is running — kill it or just use the port Vite chose.
 - Changed a key in `local_config.py`? **Restart uvicorn** — the client caches the key at first use (`--reload` only watches code files).
 
+### Stopping the servers
+
+**Ctrl+C** in each terminal. Windows wrinkles:
+- Uvicorn with `--reload` may need a second Ctrl+C (reloader + worker).
+- Vite can leave a child `node` process holding the port (next start then says "Port 5173 is in use"). Free the ports with:
+  ```powershell
+  Get-NetTCPConnection -LocalPort 5173,8000 -State Listen |
+    ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+  ```
+
 ## 4. Testing each feature
 
 Work through these in order; together they cover the whole PRD.
