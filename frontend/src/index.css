@@ -449,6 +449,43 @@ body {
 }
 
 
+/* staggered letter entrance for the landing title */
+@keyframes letter-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.letter-in {
+  display: inline-block;
+  animation: letter-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes letter-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(4px);
+  }
+}
+
+.letter-out {
+  display: inline-block;
+  animation: letter-out 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* thin dark scrollbar for the chat list */
 .chat-scroll::-webkit-scrollbar {
   width: 6px;

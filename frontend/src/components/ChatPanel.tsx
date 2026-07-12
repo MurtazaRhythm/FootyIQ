@@ -58,6 +58,16 @@ export default function ChatPanel({
   const [draft, setDraft] = useState("");
   const [image, setImage] = useState<string | null>(null);
   const [hypeMode, setHypeMode] = useState<HypeMode | null>(null);
+  const [titlePhase, setTitlePhase] = useState<"in" | "out">("in");
+
+  useEffect(() => {
+    if (isActive) return;
+    const cycle = setInterval(() => {
+      setTitlePhase("out");
+      setTimeout(() => setTitlePhase("in"), 800);
+    }, 10000);
+    return () => clearInterval(cycle);
+  }, [isActive]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -410,7 +420,7 @@ export default function ChatPanel({
   );
 
   return (
-    <div className="flex flex-col h-full pt-[68px]">
+    <div className="flex flex-col h-full pt-14">
       {/* Voice orb overlay — shown when voice mode is on OR audio is playing */}
       {showOrb && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm">
@@ -432,7 +442,19 @@ export default function ChatPanel({
         <div className="flex-1 flex flex-col items-center justify-center gap-8 px-4">
           <div className="text-center animate-fade-up" style={{ animationDelay: "0.05s" }}>
             <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
-              Pitchside
+              {"Pitchside".split("").map((char, i, arr) => (
+                <span
+                  key={i}
+                  className={titlePhase === "in" ? "letter-in" : "letter-out"}
+                  style={{
+                    animationDelay: titlePhase === "in"
+                      ? `${i * 0.06}s`
+                      : `${(arr.length - 1 - i) * 0.06}s`,
+                  }}
+                >
+                  {char}
+                </span>
+              ))}
             </h1>
             <p className="mt-2 text-sm sm:text-base text-muted">
               Your coach in your pocket for the 2026 World Cup

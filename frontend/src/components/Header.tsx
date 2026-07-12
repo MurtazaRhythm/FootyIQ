@@ -37,12 +37,9 @@ export default function Header({
   onHomeClick,
 }: HeaderProps) {
   return (
-    <header className="fixed top-3 inset-x-3 z-20 flex justify-center pointer-events-none animate-fade-down">
-      <nav className="glass-panel glass-panel-glow pointer-events-auto relative flex items-center justify-between gap-3 w-full max-w-3xl h-12 pl-4 pr-2 rounded-lg">
-        {/* sweeping sheen, clipped to the panel's rounded corners */}
-        <span className="glass-panel-sheen" aria-hidden />
-        {/* top hairline highlight, gives the glass a lit edge */}
-        <span className="glass-hairline" aria-hidden />
+    <header className="fixed top-0 inset-x-0 z-20 animate-fade-down">
+      <nav className="relative flex items-center w-full h-14 bg-transparent">
+        <div className="flex items-center justify-between gap-3 w-full max-w-3xl mx-auto px-6">
 
         {/* during a chat the logo doubles as a home button (confirmed in App) */}
         <button
@@ -53,20 +50,11 @@ export default function Header({
           }`}
           aria-label={isActive ? "Back to home" : "Pitchside"}
         >
-          <span
-            className={`w-2 h-2 rounded-full bg-accent shadow-[0_0_10px_rgba(99,102,241,0.8)] ${
-              isActive
-                ? "group-hover:shadow-[0_0_14px_3px_rgba(99,102,241,0.7)] transition-shadow"
-                : ""
-            }`}
+          <img
+            src={theme === "dark" ? "/logo-dark.png" : "/logo-light.png"}
+            alt="Pitchside"
+            className="w-14 h-14 object-contain"
           />
-          <span
-            className={`text-sm font-semibold tracking-tight transition-colors ${
-              isActive ? "group-hover:text-accent" : ""
-            }`}
-          >
-            Pitchside
-          </span>
         </button>
 
         <div className="flex items-center gap-2">
@@ -92,6 +80,7 @@ export default function Header({
           >
             {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
           </button>
+        </div>
         </div>
       </nav>
     </header>
