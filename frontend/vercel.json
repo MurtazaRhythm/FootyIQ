@@ -4,6 +4,7 @@
     { "source": "/speak", "destination": "https://pitchside-backend-wu83.onrender.com/speak" },
     { "source": "/transcribe", "destination": "https://pitchside-backend-wu83.onrender.com/transcribe" },
     { "source": "/hype", "destination": "https://pitchside-backend-wu83.onrender.com/hype" },
+    { "source": "/ticker", "destination": "https://pitchside-backend-wu83.onrender.com/ticker" },
     { "source": "/health", "destination": "https://pitchside-backend-wu83.onrender.com/health" }
   ]
 }

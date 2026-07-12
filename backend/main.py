@@ -5,6 +5,7 @@
 The Vite dev server proxies /chat, /speak, and /transcribe here."""
 
 import logging
+import time
 from typing import Literal, Optional
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -91,6 +92,33 @@ class ChatResponse(BaseModel):
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
+
+
+# T4: match-day ticker — cached in memory so the landing page never adds
+# per-visit Gemini cost or latency (PRD-ui-theme)
+_ticker_cache: dict[str, tuple[float, str]] = {}
+TICKER_TTL_SECONDS = 30 * 60
+
+
+class TickerResponse(BaseModel):
+    headline: str
+
+
+@app.get("/ticker")
+def ticker(
+    language: Literal[*LANGUAGES] = "en", refresh: bool = False
+) -> TickerResponse:
+    cached = _ticker_cache.get(language)
+    if cached and not refresh and time.time() - cached[0] < TICKER_TTL_SECONDS:
+        return TickerResponse(headline=cached[1])
+    try:
+        headline = gemini_client.generate_ticker(language)
+    except Exception:
+        # the frontend renders nothing on any failure; never cache errors
+        logger.exception("Ticker generation failed")
+        raise HTTPException(status_code=502, detail="Ticker failed")
+    _ticker_cache[language] = (time.time(), headline)
+    return TickerResponse(headline=headline)
 
 
 @app.post("/chat")

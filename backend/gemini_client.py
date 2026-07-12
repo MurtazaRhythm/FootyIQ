@@ -332,6 +332,37 @@ def generate_reply(
     }
 
 
+def generate_ticker(language: str) -> str:
+    """T4: one broadcast ticker line for the landing page, grounded in the
+    real fixture list. Cached by the caller — this is never on a hot path."""
+    response = client().models.generate_content(
+        model=GEMINI_CHAT_MODEL,
+        contents=(
+            "What is the single most important in-progress or upcoming "
+            "fixture at the 2026 FIFA World Cup right now?"
+        ),
+        config=types.GenerateContentConfig(
+            system_instruction=(
+                "You write one broadcast-style ticker line about the 2026 "
+                "FIFA World Cup. Use Google Search to find the current or "
+                "next marquee fixture and pick EXACTLY ONE match — never "
+                "summarize several. Name both teams, the stage, and the "
+                "city if known. Reply with EXACTLY one line, uppercase, at "
+                "most 10 words, segments separated by ' · ', like: "
+                "'TONIGHT · FRANCE v SPAIN · SEMIFINAL · DALLAS'. "
+                f"Write it in {LANGUAGE_NAMES[language]}. No quotes, no "
+                "explanations, no emoji."
+            ),
+            tools=[types.Tool(google_search=types.GoogleSearch())],
+            max_output_tokens=1000,
+        ),
+    )
+    line = (response.text or "").strip().strip('"').splitlines()[0].strip()
+    if not line:
+        raise RuntimeError("empty ticker line")
+    return line
+
+
 HYPE_MODES = {
     "preview": (
         "Write a dramatic, stadium-announcer match/tournament preview for "

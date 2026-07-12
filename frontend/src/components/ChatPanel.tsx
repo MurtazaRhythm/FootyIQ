@@ -74,6 +74,24 @@ export default function ChatPanel({
   const [hypeMode, setHypeMode] = useState<HypeMode | null>(null);
   const [titlePhase, setTitlePhase] = useState<"in" | "out">("in");
 
+  // T4: match-day ticker — renders nothing on any failure so it can
+  // never block or degrade the landing
+  const [ticker, setTicker] = useState("");
+  useEffect(() => {
+    if (isActive) return;
+    let cancelled = false;
+    setTicker("");
+    fetch(`/ticker?language=${language}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d?.headline) setTicker(d.headline);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [language, isActive]);
+
   useEffect(() => {
     if (isActive) return;
     const cycle = setInterval(() => {
@@ -645,6 +663,15 @@ export default function ChatPanel({
             <p className="mt-2 text-sm sm:text-base text-muted">
               {TAGLINE[language]}
             </p>
+            {/* T4: broadcast strip with the real marquee fixture */}
+            {ticker && (
+              <div className="mt-4 flex justify-center animate-fade-up">
+                <span className="glass-chip inline-flex h-8 items-center gap-2 rounded-full px-4 text-[11px] font-medium tracking-widest text-primary/75">
+                  <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-accent" aria-hidden />
+                  {ticker}
+                </span>
+              </div>
+            )}
           </div>
 
           <div

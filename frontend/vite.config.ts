@@ -19,6 +19,7 @@ export default defineConfig({
       "/speak": "http://127.0.0.1:8000",
       "/transcribe": "http://127.0.0.1:8000",
       "/hype": "http://127.0.0.1:8000",
+      "/ticker": "http://127.0.0.1:8000",
     },
   },
 });
