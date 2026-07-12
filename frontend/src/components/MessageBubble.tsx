@@ -1,5 +1,6 @@
 import type { Language, Message, Persona } from "@/lib/types";
 import AudioPlayer from "@/components/AudioPlayer";
+import PitchDiagram from "@/components/PitchDiagram";
 import pepAvatar from "/pep.jpg";
 import joseAvatar from "/jose.jpg";
 import pochAvatar from "/pochh.jpg";
@@ -85,6 +86,9 @@ export default function MessageBubble({
         <p className="text-sm leading-7 whitespace-pre-wrap text-primary/90">
           {renderText(message.text)}
         </p>
+        {message.diagram && message.diagram.players.length > 0 && (
+          <PitchDiagram diagram={message.diagram} />
+        )}
         {message.sources && message.sources.length > 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/50 pt-2">
             <span className="text-[11px] font-mono text-muted">sources</span>

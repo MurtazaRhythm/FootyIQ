@@ -49,11 +49,34 @@ class Source(BaseModel):
     url: str
 
 
+class DiagramPlayer(BaseModel):
+    x: float
+    y: float
+    team: Literal["attack", "defense"]
+    label: str = ""
+
+
+class DiagramArrow(BaseModel):
+    fromX: float
+    fromY: float
+    toX: float
+    toY: float
+    style: Literal["pass", "run"] = "run"
+
+
+class Diagram(BaseModel):
+    title: str
+    players: list[DiagramPlayer]
+    arrows: list[DiagramArrow] = []
+
+
 class ChatResponse(BaseModel):
     text: str
     intensity: Literal["calm", "building", "explosive"] = "calm"
     # web sources from Google Search grounding; empty for ungrounded answers
     sources: list[Source] = []
+    # S6: tactical whiteboard, present only for diagram-worthy questions
+    diagram: Optional[Diagram] = None
 
 
 @app.get("/health")
@@ -79,6 +102,7 @@ def chat(req: ChatRequest) -> ChatResponse:
         text=reply["text"],
         intensity=reply["intensity"],
         sources=reply.get("sources", []),
+        diagram=reply.get("diagram"),
     )
 
 

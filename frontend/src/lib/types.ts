@@ -9,6 +9,28 @@ export interface Source {
   url: string;
 }
 
+// S6 tactical whiteboard: pitch is 100 wide (x) by 65 tall (y)
+export interface DiagramPlayer {
+  x: number;
+  y: number;
+  team: "attack" | "defense";
+  label?: string;
+}
+
+export interface DiagramArrow {
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+  style?: "pass" | "run";
+}
+
+export interface Diagram {
+  title: string;
+  players: DiagramPlayer[];
+  arrows?: DiagramArrow[];
+}
+
 export interface Message {
   id: string;
   role: "user" | "coach";
@@ -18,6 +40,7 @@ export interface Message {
   sources?: Source[]; // Google Search grounding citations
   autoSpeak?: boolean; // voice-initiated turns speak their reply
   persona?: Persona; // persona active when this message was sent
+  diagram?: Diagram | null; // S6 tactical whiteboard
   timestamp: number;
 }
 

@@ -14,6 +14,7 @@ interface ChatResponse {
   text: string;
   intensity?: Intensity;
   sources?: Source[];
+  diagram?: import("@/lib/types").Diagram | null;
 }
 
 const PIPELINE_STEPS: PipelineState[] = ["Thinking", "Generating"];
@@ -97,6 +98,7 @@ export function useChat(persona: Persona, language: Language, voiceReplies = fal
             text: data.text,
             intensity: data.intensity ?? "calm",
             sources: data.sources ?? [],
+            diagram: data.diagram ?? null,
             // spoken when global voice toggle is on; voice-initiated always speak
             autoSpeak: voiceReplies || (opts?.voice ?? false),
             persona,

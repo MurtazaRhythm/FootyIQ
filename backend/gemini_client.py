@@ -3,6 +3,7 @@
 Gemini integration covers F1–F4 (see PRD, Key technical decisions)."""
 
 import base64
+import json
 import re
 
 from google import genai
@@ -85,6 +86,18 @@ INTENSITY_TAG_RULE = (
     "then the answer on the following lines."
 )
 
+# S6: the main call only *tags* diagram-worthiness; a separate structured
+# call draws it, so the whiteboard can never break the chat path.
+DIAGRAM_TAG_RULE = (
+    "On the line right after the INTENSITY line, write exactly "
+    "'DIAGRAM: yes' or 'DIAGRAM: no'. Use 'yes' only when the question is "
+    "about a formation, tactical shape, pressing structure, or a specific "
+    "on-pitch situation that a 2D top-down pitch diagram would genuinely "
+    "clarify (e.g. 'explain a 4-3-3', 'what is a high line', 'what is a "
+    "false nine'). Use 'no' for rules trivia, results, schedules, players, "
+    "and general questions."
+)
+
 
 COACH_PERSONAS = {
     "new-fan":      ("El Pocho",        "warm, encouraging, patient — like Pochettino building belief"),
@@ -112,6 +125,7 @@ def build_system_prompt(persona: str, language: str) -> str:
             "Avoid em dashes (—). Use commas, conjunctions, or short "
             "sentences instead.",
             INTENSITY_TAG_RULE,
+            DIAGRAM_TAG_RULE,
         ]
     )
 
@@ -141,6 +155,100 @@ def _extract_sources(response) -> list[dict]:
 INTENSITY_TAG_RE = re.compile(
     r"^\s*INTENSITY:\s*(calm|building|explosive)\s*\n?", re.IGNORECASE
 )
+DIAGRAM_TAG_RE = re.compile(r"^\s*DIAGRAM:\s*(yes|no)\s*\n?", re.IGNORECASE)
+
+# Pitch coordinates: x 0-100 (attacking left -> right), y 0-65 (top -> bottom)
+DIAGRAM_SCHEMA = types.Schema(
+    type=types.Type.OBJECT,
+    properties={
+        "title": types.Schema(type=types.Type.STRING),
+        "players": types.Schema(
+            type=types.Type.ARRAY,
+            items=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "x": types.Schema(type=types.Type.NUMBER),
+                    "y": types.Schema(type=types.Type.NUMBER),
+                    "team": types.Schema(
+                        type=types.Type.STRING, enum=["attack", "defense"]
+                    ),
+                    "label": types.Schema(type=types.Type.STRING),
+                },
+                required=["x", "y", "team"],
+            ),
+        ),
+        "arrows": types.Schema(
+            type=types.Type.ARRAY,
+            items=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "fromX": types.Schema(type=types.Type.NUMBER),
+                    "fromY": types.Schema(type=types.Type.NUMBER),
+                    "toX": types.Schema(type=types.Type.NUMBER),
+                    "toY": types.Schema(type=types.Type.NUMBER),
+                    "style": types.Schema(
+                        type=types.Type.STRING, enum=["pass", "run"]
+                    ),
+                },
+                required=["fromX", "fromY", "toX", "toY"],
+            ),
+        ),
+    },
+    required=["title", "players"],
+)
+
+
+def generate_diagram(question: str, answer: str) -> dict | None:
+    """S6: second, structured-output-only call (no search tool, so JSON mode
+    is safe here). Returns a diagram dict or None — never raises, because a
+    failed drawing must not break the chat reply it accompanies."""
+    try:
+        response = client().models.generate_content(
+            model=GEMINI_CHAT_MODEL,
+            contents=(
+                f"Question: {question}\n\nCoach's answer: {answer}\n\n"
+                "Draw the tactical diagram that best illustrates this answer."
+            ),
+            config=types.GenerateContentConfig(
+                system_instruction=(
+                    "You generate top-down soccer pitch diagrams. The pitch "
+                    "is 100 wide (x, the featured team attacks left to "
+                    "right) and 65 tall (y). Place at most 11 'attack' "
+                    "players (the featured shape/formation) and only the "
+                    "'defense' players that matter for the concept (often "
+                    "none). Use short position labels (GK, LB, CB, CM, ST, "
+                    "LW...). Add at most 5 arrows: 'run' for player "
+                    "movement, 'pass' for ball movement. Keep it minimal "
+                    "and legible."
+                ),
+                response_mime_type="application/json",
+                response_schema=DIAGRAM_SCHEMA,
+            ),
+        )
+        diagram = json.loads(response.text)
+        # clamp to the pitch and sane counts so the client renders safely
+        diagram["players"] = [
+            {
+                "x": min(100, max(0, p["x"])),
+                "y": min(65, max(0, p["y"])),
+                "team": p["team"],
+                "label": (p.get("label") or "")[:3],
+            }
+            for p in diagram.get("players", [])[:22]
+        ]
+        diagram["arrows"] = [
+            {
+                "fromX": min(100, max(0, a["fromX"])),
+                "fromY": min(65, max(0, a["fromY"])),
+                "toX": min(100, max(0, a["toX"])),
+                "toY": min(65, max(0, a["toY"])),
+                "style": a.get("style") or "run",
+            }
+            for a in diagram.get("arrows", [])[:8]
+        ]
+        return diagram if diagram["players"] else None
+    except Exception:
+        return None
 
 
 def generate_reply(
@@ -186,10 +294,20 @@ def generate_reply(
 
     text = response.text or ""
     match = INTENSITY_TAG_RE.match(text)
+    text = INTENSITY_TAG_RE.sub("", text, count=1)
+    diagram_match = DIAGRAM_TAG_RE.match(text)
+    text = DIAGRAM_TAG_RE.sub("", text, count=1).strip()
+
+    # S6: only tactics-shaped questions get the second, diagram-drawing call
+    diagram = None
+    if diagram_match and diagram_match.group(1).lower() == "yes":
+        diagram = generate_diagram(message, text)
+
     return {
-        "text": INTENSITY_TAG_RE.sub("", text, count=1).strip(),
+        "text": text,
         "intensity": match.group(1).lower() if match else "calm",
         "sources": _extract_sources(response),
+        "diagram": diagram,
     }
 
 
