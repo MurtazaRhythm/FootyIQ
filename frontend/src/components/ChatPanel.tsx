@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Camera, ImagePlus, Megaphone, Mic, X } from "lucide-react";
+import { ArrowUp, Camera, ImagePlus, Megaphone, Mic, Phone, X } from "lucide-react";
 import type { HypeMode, Language, Persona, PipelineState, Message } from "@/lib/types";
 import {
   COMPOSER_PLACEHOLDERS,
@@ -113,6 +113,14 @@ export default function ChatPanel({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
+  // S4 Coach Call: hands-free conversation loop + orb/audio plumbing
+  const [callActive, setCallActive] = useState(false);
+  const [audioPlaying, setAudioPlaying] = useState(false);
+  const [orbDismissed, setOrbDismissed] = useState(false);
+  const [stopSignal, setStopSignal] = useState(0);
+  const discardRef = useRef(false);
+  const vadStopRef = useRef<(() => void) | null>(null);
+
   // composer placeholder rotates with a fade; while the mic is on it cycles
   // through the listening phrases instead
   const placeholders = COMPOSER_PLACEHOLDERS[language];
@@ -211,12 +219,7 @@ export default function ChatPanel({
     .reverse()
     .find((m) => m.role === "coach")?.id;
 
-  const toggleMic = async () => {
-    if (listening) {
-      mediaRecorderRef.current?.stop();
-      return;
-    }
-
+  const startListening = async (vad: boolean) => {
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -225,19 +228,63 @@ export default function ChatPanel({
       setDraft(
         "Mic access is blocked — allow the microphone for this site in your browser settings, then try again.",
       );
+      setCallActive(false); // can't hold a call without a mic
       return;
     }
 
     const recorder = new MediaRecorder(stream);
     audioChunksRef.current = [];
+    discardRef.current = false;
 
     recorder.ondataavailable = (e) => {
       if (e.data.size > 0) audioChunksRef.current.push(e.data);
     };
 
+    // S4: voice-activity detection ends the turn after ~1.5s of silence
+    // following speech, so a Coach Call needs zero touches between turns
+    if (vad) {
+      const ctx = new AudioContext();
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 2048;
+      ctx.createMediaStreamSource(stream).connect(analyser);
+      const buf = new Uint8Array(analyser.fftSize);
+      let spoke = false;
+      let silentMs = 0;
+      const interval = window.setInterval(() => {
+        analyser.getByteTimeDomainData(buf);
+        let sum = 0;
+        for (let i = 0; i < buf.length; i++) {
+          const v = (buf[i] - 128) / 128;
+          sum += v * v;
+        }
+        const rms = Math.sqrt(sum / buf.length);
+        if (rms > 0.02) {
+          spoke = true;
+          silentMs = 0;
+        } else if (spoke) {
+          silentMs += 100;
+        }
+        if (spoke && silentMs >= 1500 && recorder.state === "recording") {
+          recorder.stop();
+        }
+      }, 100);
+      // hard cap so a noisy room can't record forever
+      const cap = window.setTimeout(() => {
+        if (recorder.state === "recording") recorder.stop();
+      }, 20000);
+      vadStopRef.current = () => {
+        window.clearInterval(interval);
+        window.clearTimeout(cap);
+        ctx.close();
+      };
+    }
+
     recorder.onstop = async () => {
       stream.getTracks().forEach((t) => t.stop());
+      vadStopRef.current?.();
+      vadStopRef.current = null;
       setListening(false);
+      if (discardRef.current) return; // hang-up: drop the clip unsent
       setTranscribing(true);
       try {
         const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
@@ -271,9 +318,32 @@ export default function ChatPanel({
     setOrbDismissed(false);
   };
 
-  const [audioPlaying, setAudioPlaying] = useState(false);
-  const [orbDismissed, setOrbDismissed] = useState(false);
-  const [stopSignal, setStopSignal] = useState(0);
+  const toggleMic = () => {
+    if (listening) {
+      mediaRecorderRef.current?.stop();
+      return;
+    }
+    startListening(false);
+  };
+
+  // S4: the call loop — whenever an active call goes idle (nothing being
+  // recorded, transcribed, generated, or spoken), reopen the mic
+  useEffect(() => {
+    if (!callActive) return;
+    if (listening || transcribing || pipelineState || audioPlaying) return;
+    const t = window.setTimeout(() => startListening(true), 700);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callActive, listening, transcribing, pipelineState, audioPlaying]);
+
+  const endCall = () => {
+    setCallActive(false);
+    if (mediaRecorderRef.current?.state === "recording") {
+      discardRef.current = true; // whatever was mid-recording dies with the call
+      mediaRecorderRef.current.stop();
+    }
+    setStopSignal((s) => s + 1); // cut off any speech in progress
+  };
 
   // reset dismissed state whenever new audio starts
   useEffect(() => {
@@ -288,13 +358,17 @@ export default function ChatPanel({
         ? "listening"
         : "idle";
 
-  // the orb belongs to the mic flow only — voiceMode is just the
-  // auto-speak mute and shouldn't summon a full-screen overlay
-  const showOrb = (listening || transcribing) && !orbDismissed;
+  // the orb belongs to the mic flow and Coach Calls — voiceMode is just
+  // the auto-speak mute and shouldn't summon a full-screen overlay
+  const showOrb = callActive || ((listening || transcribing) && !orbDismissed);
   const showAudioGlow = audioPlaying && !showOrb;
 
   const handleOrbToggle = () => {
-    if (listening) mediaRecorderRef.current?.stop();
+    if (callActive) {
+      endCall();
+    } else if (listening) {
+      mediaRecorderRef.current?.stop();
+    }
     setOrbDismissed(true);
   };
 
@@ -449,6 +523,16 @@ export default function ChatPanel({
             </svg>
           </button>
 
+          {/* S4: start a hands-free Coach Call */}
+          <button
+            onClick={() => setCallActive(true)}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary/5 hover:text-primary"
+            aria-label="Start a coach call"
+            title="Coach Call — hands-free conversation"
+          >
+            <Phone size={16} />
+          </button>
+
           <button
             onClick={toggleMic}
             disabled={transcribing}
@@ -510,7 +594,7 @@ export default function ChatPanel({
             onClick={handleOrbToggle}
             className="absolute bottom-28 left-1/2 -translate-x-1/2 px-5 py-2 rounded-full text-sm text-white/60 border border-white/10 hover:text-white hover:border-white/30 transition-colors"
           >
-            Cancel
+            {callActive ? "End call" : "Cancel"}
           </button>
         </div>
       )}

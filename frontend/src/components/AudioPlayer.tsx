@@ -44,7 +44,9 @@ export default function AudioPlayer({
     };
   }, []);
 
+  const stopSignalRef = useRef(stopSignal);
   useEffect(() => {
+    stopSignalRef.current = stopSignal;
     if (stopSignal > 0) stop();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stopSignal]);
@@ -67,6 +69,9 @@ export default function AudioPlayer({
 
     setState("loading");
     onPlayingChange?.(true);
+    // a stop (e.g. call hang-up) while the fetch is in flight must win —
+    // otherwise the audio starts playing after the user ended everything
+    const signalAtStart = stopSignalRef.current;
     try {
       const res = await fetch("/speak", {
         method: "POST",
@@ -74,6 +79,11 @@ export default function AudioPlayer({
         body: JSON.stringify({ text, voice_style: intensity, language, persona }),
       });
       if (!res.ok) throw new Error(`speak request failed: ${res.status}`);
+      if (stopSignalRef.current !== signalAtStart) {
+        setState("idle");
+        onPlayingChange?.(false);
+        return;
+      }
 
       const blob = await res.blob();
       urlRef.current = URL.createObjectURL(blob);
