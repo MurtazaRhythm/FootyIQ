@@ -8,7 +8,7 @@ import type {
   PipelineState,
   Source,
 } from "@/lib/types";
-import { HYPE_LABELS } from "@/lib/types";
+import { HYPE_LABELS, PIPELINE_PHRASES } from "@/lib/types";
 
 interface ChatResponse {
   text: string;
@@ -19,7 +19,6 @@ interface ChatResponse {
   segments?: import("@/lib/types").Segment[]; // S5 hype script
 }
 
-const PIPELINE_STEPS: PipelineState[] = ["Thinking", "Generating"];
 
 let nextId = 0;
 const makeId = () => `msg-${Date.now()}-${nextId++}`;
@@ -39,16 +38,21 @@ export function useChat(persona: Persona, language: Language, voiceReplies = fal
   const lastLanguageRef = useRef<Language>(language);
 
   const clearPipeline = () => {
-    pipelineTimers.current.forEach((t) => window.clearTimeout(t));
+    pipelineTimers.current.forEach((t) => window.clearInterval(t));
     pipelineTimers.current = [];
     setPipelineState(null);
   };
 
-  // advance through discrete pipeline states while waiting on the backend
+  // T1: rotate broadcast-flavored phrases while waiting on the backend
   const startPipeline = () => {
-    setPipelineState(PIPELINE_STEPS[0]);
+    const phrases = PIPELINE_PHRASES[language];
+    let i = 0;
+    setPipelineState(phrases[0]);
     pipelineTimers.current.push(
-      window.setTimeout(() => setPipelineState(PIPELINE_STEPS[1]), 3000),
+      window.setInterval(() => {
+        i = (i + 1) % phrases.length;
+        setPipelineState(phrases[i]);
+      }, 2600),
     );
   };
 

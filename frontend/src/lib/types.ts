@@ -2,7 +2,39 @@ export type Persona = "new-fan" | "casual" | "tactics-nerd";
 export type Language = "en" | "fr" | "es";
 export type Intensity = "calm" | "building" | "explosive";
 
-export type PipelineState = "Thinking" | "Generating";
+export type PipelineState = string;
+
+// T1: the pipeline indicator rotates broadcast-flavored phrases
+export const PIPELINE_PHRASES: Record<Language, string[]> = {
+  en: [
+    "Reading the game…",
+    "Checking with VAR…",
+    "Consulting the bench…",
+    "Chalking the tactics board…",
+  ],
+  fr: [
+    "Lecture du jeu…",
+    "Consultation de la VAR…",
+    "On consulte le banc…",
+    "Tableau tactique en cours…",
+  ],
+  es: [
+    "Leyendo el partido…",
+    "Consultando el VAR…",
+    "Mirando al banquillo…",
+    "Pizarra táctica en marcha…",
+  ],
+};
+
+// T2: tooltip labels for the card-style intensity cues
+export const INTENSITY_CARD_LABEL: Record<
+  Language,
+  { building: string; explosive: string }
+> = {
+  en: { building: "Tension building", explosive: "Explosive moment" },
+  fr: { building: "La tension monte", explosive: "Moment explosif" },
+  es: { building: "Sube la tensión", explosive: "Momento explosivo" },
+};
 
 export interface Source {
   title: string;

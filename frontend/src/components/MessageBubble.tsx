@@ -1,4 +1,5 @@
 import type { Language, Message, Persona } from "@/lib/types";
+import { INTENSITY_CARD_LABEL } from "@/lib/types";
 import AudioPlayer from "@/components/AudioPlayer";
 import PitchDiagram from "@/components/PitchDiagram";
 import pepAvatar from "/pep.jpg";
@@ -15,11 +16,38 @@ interface MessageBubbleProps {
   stopSignal?: number;
 }
 
+// T3: each coach carries a signature color, used only on the avatar ring
+// and name tint so the glass identity stays dominant
 const COACH = {
-  "tactics-nerd": { src: pepAvatar,  name: "El Maestro",      position: "50% 10%" },
-  "new-fan":      { src: pochAvatar, name: "El Pocho",         position: "50% 15%" },
-  "casual":       { src: joseAvatar, name: "The Special One",  position: "50% 15%" },
-} satisfies Record<Persona, { src: string; name: string; position: string }>;
+  "tactics-nerd": { src: pepAvatar,  name: "El Maestro",      position: "50% 10%", color: "#2dd4bf" },
+  "new-fan":      { src: pochAvatar, name: "El Pocho",         position: "50% 15%", color: "#38bdf8" },
+  "casual":       { src: joseAvatar, name: "The Special One",  position: "50% 15%", color: "#ef4444" },
+} satisfies Record<
+  Persona,
+  { src: string; name: string; position: string; color: string }
+>;
+
+// T2: football-native intensity cues — a yellow card for building drama,
+// a red card for explosive moments (calm shows nothing). Fixes D3.
+function IntensityCard({
+  intensity,
+  language,
+}: {
+  intensity: "building" | "explosive";
+  language: Language;
+}) {
+  return (
+    <span
+      className="inline-block h-[13px] w-[9px] rounded-[2px] rotate-6"
+      style={{
+        backgroundColor: intensity === "building" ? "#facc15" : "#dc2626",
+      }}
+      title={INTENSITY_CARD_LABEL[language][intensity]}
+      role="img"
+      aria-label={INTENSITY_CARD_LABEL[language][intensity]}
+    />
+  );
+}
 
 function renderText(text: string) {
   return text.split(/(\*\*.*?\*\*)/g).map((chunk, i) =>
@@ -75,12 +103,18 @@ export default function MessageBubble({
         <img
           src={coach.src}
           alt={coach.name}
-          className="w-16 h-16 rounded-xl object-cover"
-          style={{ objectPosition: coach.position }}
+          className="w-16 h-16 rounded-xl object-cover border-2"
+          style={{ objectPosition: coach.position, borderColor: coach.color }}
         />
-        <span className="text-[11px] font-medium uppercase tracking-wider text-muted">
+        <span
+          className="text-[11px] font-medium uppercase tracking-wider"
+          style={{ color: coach.color, opacity: 0.85 }}
+        >
           {coach.name}
         </span>
+        {(intensity === "building" || intensity === "explosive") && (
+          <IntensityCard intensity={intensity} language={language} />
+        )}
       </div>
       <div className="max-w-[85%]">
         <p className="text-sm leading-7 whitespace-pre-wrap text-primary/90">

@@ -611,7 +611,21 @@ export default function ChatPanel({
       )}
       {!isActive ? (
         /* landing: hero, suggested prompts, composer directly below them */
-        <div className="flex-1 flex flex-col items-center justify-center gap-8 px-4">
+        <div className="relative flex-1 flex flex-col items-center justify-center gap-8 px-4">
+          {/* T5: faint pitch markings behind the hero — static, theme-aware,
+              invisible until noticed by design */}
+          <svg
+            viewBox="0 0 200 130"
+            className="pointer-events-none absolute left-1/2 top-1/2 w-[min(90vw,640px)] -translate-x-1/2 -translate-y-1/2 text-primary opacity-[0.05]"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="0.6"
+            aria-hidden
+          >
+            <line x1="100" y1="0" x2="100" y2="130" />
+            <circle cx="100" cy="65" r="24" />
+            <circle cx="100" cy="65" r="1.4" fill="currentColor" stroke="none" />
+          </svg>
           <div className="text-center animate-fade-up" style={{ animationDelay: "0.05s" }}>
             <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
               {"Pitchside".split("").map((char, i, arr) => (
