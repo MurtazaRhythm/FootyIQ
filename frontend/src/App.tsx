@@ -39,6 +39,9 @@ export default function App() {
   const [persona, setPersona] = useState<Persona>("new-fan");
   const [language, setLanguage] = useState<Language>("en");
   const [confirmingHome, setConfirmingHome] = useState(false);
+  const [voiceMode, setVoiceMode] = useState(
+    () => localStorage.getItem("voiceMode") === "1",
+  );
   const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem("theme") as Theme) ?? "dark",
   );
@@ -54,7 +57,15 @@ export default function App() {
   const { messages, pipelineState, sendMessage, sendHype, resetChat } = useChat(
     persona,
     language,
+    voiceMode,
   );
+
+  const toggleVoiceMode = () => {
+    setVoiceMode((v) => {
+      localStorage.setItem("voiceMode", v ? "0" : "1");
+      return !v;
+    });
+  };
 
   const isActive = messages.length > 0;
 
@@ -85,6 +96,8 @@ export default function App() {
           pipelineState={pipelineState}
           language={language}
           persona={persona}
+          voiceMode={voiceMode}
+          onVoiceModeToggle={toggleVoiceMode}
           onSend={sendMessage}
           onHype={sendHype}
         />

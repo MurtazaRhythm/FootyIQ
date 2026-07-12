@@ -27,7 +27,7 @@ const LANGUAGE_SWITCH_NOTICE: Record<Language, string> = {
   es: "[El usuario acaba de cambiar al español. Responde en español a partir de ahora.]",
 };
 
-export function useChat(persona: Persona, language: Language) {
+export function useChat(persona: Persona, language: Language, voiceReplies = false) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [pipelineState, setPipelineState] = useState<PipelineState | null>(null);
   const pipelineTimers = useRef<number[]>([]);
@@ -97,8 +97,8 @@ export function useChat(persona: Persona, language: Language) {
             text: data.text,
             intensity: data.intensity ?? "calm",
             sources: data.sources ?? [],
-            // hands-free loop: a spoken question gets a spoken answer
-            autoSpeak: opts?.voice ?? false,
+            // spoken when global voice toggle is on; voice-initiated always speak
+            autoSpeak: voiceReplies || (opts?.voice ?? false),
             persona,
             timestamp: Date.now(),
           },
@@ -118,7 +118,7 @@ export function useChat(persona: Persona, language: Language) {
         clearPipeline();
       }
     },
-    [persona, language],
+    [persona, language, voiceReplies],
   );
 
   // F9: one-tap hype content — appears in the chat like any other exchange
@@ -150,6 +150,7 @@ export function useChat(persona: Persona, language: Language) {
             text: data.text,
             intensity: data.intensity ?? "explosive",
             sources: data.sources ?? [],
+            autoSpeak: voiceReplies,
             persona,
             timestamp: Date.now(),
           },
@@ -169,7 +170,7 @@ export function useChat(persona: Persona, language: Language) {
         clearPipeline();
       }
     },
-    [language, persona],
+    [language, persona, voiceReplies],
   );
 
   // wipe the session and return to the landing state

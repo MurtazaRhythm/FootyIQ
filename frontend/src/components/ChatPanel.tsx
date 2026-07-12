@@ -17,6 +17,8 @@ interface ChatPanelProps {
   pipelineState: PipelineState | null;
   language: Language;
   persona: Persona;
+  voiceMode: boolean;
+  onVoiceModeToggle: () => void;
   onSend: (text: string, image?: string, opts?: { voice?: boolean }) => void;
   onHype: (team: string, mode: HypeMode) => void;
 }
@@ -48,6 +50,8 @@ export default function ChatPanel({
   pipelineState,
   language,
   persona,
+  voiceMode,
+  onVoiceModeToggle,
   onSend,
   onHype,
 }: ChatPanelProps) {
@@ -181,17 +185,6 @@ export default function ChatPanel({
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
   };
 
-  // voice mode: coach replies are spoken aloud automatically
-  const [voiceMode, setVoiceMode] = useState(
-    () => localStorage.getItem("voiceMode") === "1",
-  );
-
-  const toggleVoiceMode = () => {
-    setVoiceMode((v) => {
-      localStorage.setItem("voiceMode", v ? "0" : "1");
-      return !v;
-    });
-  };
 
   const latestCoachId = [...messages]
     .reverse()
@@ -204,6 +197,10 @@ export default function ChatPanel({
   useEffect(() => {
     return () => recognitionRef.current?.abort();
   }, []);
+
+  // strip non-speech annotations from Web Speech transcripts
+  const cleanTranscript = (text: string) =>
+    text.replace(/[([][^)\]]*[)\]]/g, "").trim();
 
   const toggleMic = () => {
     if (listening) {
@@ -227,7 +224,8 @@ export default function ChatPanel({
         transcript += event.results[i][0].transcript;
       }
       const base = dictationBaseRef.current;
-      setDraft(base ? `${base} ${transcript.trimStart()}` : transcript.trimStart());
+      const cleaned = cleanTranscript(transcript);
+      setDraft(base ? `${base} ${cleaned.trimStart()}` : cleaned.trimStart());
     };
     recognition.onend = () => setListening(false);
     recognition.onerror = () => setListening(false);
@@ -255,7 +253,7 @@ export default function ChatPanel({
   const showOrb = (voiceMode || audioPlaying) && !orbDismissed;
 
   const handleOrbToggle = () => {
-    if (voiceMode) toggleVoiceMode();
+    if (voiceMode) onVoiceModeToggle();
     setOrbDismissed(true);
   };
 
@@ -365,7 +363,7 @@ export default function ChatPanel({
 
           {/* voice mode toggle */}
           <button
-            onClick={toggleVoiceMode}
+            onClick={onVoiceModeToggle}
             className={
               voiceMode
                 ? "flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-accent transition-colors"
