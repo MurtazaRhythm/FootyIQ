@@ -16,6 +16,8 @@ interface DropdownProps<T extends string> {
   onChange: (value: T) => void;
   /** icon shown in the trigger next to the current label */
   triggerIcon?: ReactNode;
+  /** phones: icon-only trigger so the header fits narrow viewports */
+  compactOnMobile?: boolean;
   ariaLabel: string;
   className?: string;
 }
@@ -25,6 +27,7 @@ export default function Dropdown<T extends string>({
   options,
   onChange,
   triggerIcon,
+  compactOnMobile = false,
   ariaLabel,
   className,
 }: DropdownProps<T>) {
@@ -64,7 +67,14 @@ export default function Dropdown<T extends string>({
         {(active.icon ?? triggerIcon) && (
           <span className="text-muted">{active.icon ?? triggerIcon}</span>
         )}
-        <span className="whitespace-nowrap">{active.label}</span>
+        <span
+          className={cn(
+            "whitespace-nowrap",
+            compactOnMobile && "hidden sm:inline",
+          )}
+        >
+          {active.label}
+        </span>
         <ChevronDown
           size={14}
           className={cn(

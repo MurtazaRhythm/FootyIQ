@@ -39,7 +39,7 @@ export default function Header({
   return (
     <header className="fixed top-0 inset-x-0 z-20 animate-fade-down">
       <nav className="relative flex items-center w-full h-14 bg-transparent">
-        <div className="flex items-center justify-between gap-3 w-full max-w-3xl mx-auto px-6">
+        <div className="flex items-center justify-between gap-2 sm:gap-3 w-full max-w-3xl mx-auto px-3 sm:px-6">
 
         {/* during a chat the logo doubles as a home button (confirmed in App) */}
         <button
@@ -53,7 +53,7 @@ export default function Header({
           <img
             src={theme === "dark" ? "/logo-dark.png" : "/logo-light.png"}
             alt="Pitchside"
-            className="w-14 h-14 object-contain"
+            className="w-11 h-11 sm:w-14 sm:h-14 object-contain"
           />
         </button>
 
@@ -62,17 +62,19 @@ export default function Header({
             value={persona}
             options={PERSONA_OPTIONS}
             onChange={onPersonaChange}
+            compactOnMobile
             ariaLabel="Knowledge level"
           />
-          <span className="w-px h-4 bg-primary/10" aria-hidden />
+          <span className="hidden sm:block w-px h-4 bg-primary/10" aria-hidden />
           <Dropdown
             value={language}
             options={LANGUAGE_OPTIONS}
             onChange={onLanguageChange}
             triggerIcon={<Globe size={15} />}
+            compactOnMobile
             ariaLabel="Language"
           />
-          <span className="w-px h-4 bg-primary/10" aria-hidden />
+          <span className="hidden sm:block w-px h-4 bg-primary/10" aria-hidden />
           <button
             onClick={onThemeToggle}
             className="glass-chip flex items-center justify-center w-[34px] h-[34px] rounded-md text-muted hover:text-primary"

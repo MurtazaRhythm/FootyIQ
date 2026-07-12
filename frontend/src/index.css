@@ -35,6 +35,16 @@ body,
   height: 100%;
 }
 
+/* iOS Safari: track the dynamic viewport so the composer isn't hidden
+   behind the collapsing address bar */
+@supports (height: 100dvh) {
+  html,
+  body,
+  #root {
+    height: 100dvh;
+  }
+}
+
 body {
   margin: 0;
   background-color: rgb(var(--bg));
