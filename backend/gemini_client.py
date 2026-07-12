@@ -346,9 +346,16 @@ HYPE_MODES = {
 }
 
 
+# S5: every hype line carries its own intensity so TTS can shift delivery
+# mid-performance (the original F5 vision)
+SEGMENT_LINE_RE = re.compile(
+    r"^\s*\[(calm|building|explosive)\]\s*(.+?)\s*$", re.IGNORECASE
+)
+
+
 def generate_hype(team: str, mode: str, language: str) -> dict:
-    """F9: one-tap hype content. Grounded in the team's real current
-    tournament situation so the drama references actual results."""
+    """F9/S5: one-tap hype content, written as an intensity-tagged script.
+    Grounded in the team's real current tournament situation."""
     system = "\n\n".join(
         [
             "You are FootyIQ's hype engine: a dramatic soccer commentator and "
@@ -360,10 +367,11 @@ def generate_hype(team: str, mode: str, language: str) -> dict:
             "into the drama. If they've been eliminated, lean into "
             "nostalgia or next-time bravado instead of pretending.",
             f"Write natively in {LANGUAGE_NAMES[language]}.",
-            "Keep it under 120 words so it can be read aloud in about 40 "
-            "seconds.",
-            INTENSITY_RULE,
-            INTENSITY_TAG_RULE,
+            "Write 4 to 6 short lines, each on its own line, each starting "
+            "with exactly one tag: [calm], [building], or [explosive]. "
+            "Structure the drama like a broadcast: open measured, raise the "
+            "stakes line by line, and finish at full throat. Use at least "
+            "two different tags. Under 120 words total.",
         ]
     )
     response = client().models.generate_content(
@@ -372,13 +380,29 @@ def generate_hype(team: str, mode: str, language: str) -> dict:
         config=types.GenerateContentConfig(
             system_instruction=system,
             tools=[types.Tool(google_search=types.GoogleSearch())],
-            max_output_tokens=250,
+            max_output_tokens=300,
         ),
     )
-    text = response.text or ""
-    match = INTENSITY_TAG_RE.match(text)
+    raw = response.text or ""
+    segments = [
+        {"intensity": m.group(1).lower(), "text": m.group(2)}
+        for line in raw.splitlines()
+        if (m := SEGMENT_LINE_RE.match(line))
+    ]
+    if segments:
+        text = "\n".join(s["text"] for s in segments)
+        # bubble color reflects the peak of the performance
+        peak = max(
+            (s["intensity"] for s in segments),
+            key=["calm", "building", "explosive"].index,
+        )
+    else:
+        # model ignored the tag format — degrade gracefully to single-voice
+        text = INTENSITY_TAG_RE.sub("", raw, count=1).strip()
+        peak = "explosive"
     return {
-        "text": INTENSITY_TAG_RE.sub("", text, count=1).strip(),
-        "intensity": match.group(1).lower() if match else "explosive",
+        "text": text,
+        "intensity": peak,
         "sources": _extract_sources(response),
+        "segments": segments,
     }

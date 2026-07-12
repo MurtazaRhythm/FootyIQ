@@ -112,6 +112,7 @@ export default function MessageBubble({
             intensity={intensity}
             language={language}
             persona={message.persona ?? persona}
+            segments={message.segments}
             autoPlay={autoPlayAudio}
             createdAt={message.timestamp}
             onPlayingChange={onAudioPlaying}

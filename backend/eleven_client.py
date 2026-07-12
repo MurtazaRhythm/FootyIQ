@@ -11,6 +11,7 @@ import httpx
 
 from config import (
     ELEVEN_DEFAULT_VOICE,
+    ELEVEN_DRAMA_MODEL,
     ELEVEN_MODEL,
     ELEVEN_STT_MODEL,
     ELEVEN_VOICE_SETTINGS,
@@ -34,21 +35,26 @@ def _api_key() -> str:
     return key
 
 
-def _cache_path(text: str, intensity: str, voice_id: str) -> Path:
+def _cache_path(text: str, intensity: str, voice_id: str, model: str) -> Path:
     key = json.dumps(
-        [text, voice_id, ELEVEN_MODEL, ELEVEN_VOICE_SETTINGS[intensity]],
+        [text, voice_id, model, ELEVEN_VOICE_SETTINGS[intensity]],
         ensure_ascii=False,
     )
     return CACHE_DIR / f"{hashlib.sha256(key.encode()).hexdigest()}.mp3"
 
 
-def tts(text: str, intensity: str, persona: str | None = None) -> bytes:
+def tts(
+    text: str,
+    intensity: str,
+    persona: str | None = None,
+    model: str = ELEVEN_MODEL,
+) -> bytes:
     """Returns MP3 bytes, voiced by the coach mapped to `persona` (S1).
     The multilingual model auto-detects the language from the text itself,
     so FR/ES answers speak natively (F6) without a language parameter.
     Raises on API failure."""
     voice_id = ELEVEN_VOICES.get(persona or "", ELEVEN_DEFAULT_VOICE)
-    path = _cache_path(text, intensity, voice_id)
+    path = _cache_path(text, intensity, voice_id, model)
     if path.exists():
         return path.read_bytes()
 
@@ -59,7 +65,7 @@ def tts(text: str, intensity: str, persona: str | None = None) -> bytes:
             headers={"xi-api-key": _api_key()},
             json={
                 "text": text,
-                "model_id": ELEVEN_MODEL,
+                "model_id": model,
                 "voice_settings": ELEVEN_VOICE_SETTINGS[intensity],
             },
             timeout=60,
@@ -78,6 +84,18 @@ def tts(text: str, intensity: str, persona: str | None = None) -> bytes:
     CACHE_DIR.mkdir(exist_ok=True)
     path.write_bytes(response.content)
     return response.content
+
+
+def tts_segments(segments: list[dict], persona: str | None = None) -> bytes:
+    """S5: voice each intensity-tagged line with its own delivery settings
+    and stitch the MP3s into one performance. Segments cache individually
+    through tts(), so a replayed hype line costs nothing. Browsers play
+    concatenated MPEG frames fine for this use."""
+    return b"".join(
+        tts(s["text"], s["intensity"], persona, model=ELEVEN_DRAMA_MODEL)
+        for s in segments
+        if s["text"].strip()
+    )
 
 
 def stt(audio: bytes, mime_type: str) -> str:

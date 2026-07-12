@@ -70,9 +70,16 @@ class Diagram(BaseModel):
     arrows: list[DiagramArrow] = []
 
 
+class Segment(BaseModel):
+    text: str
+    intensity: Literal["calm", "building", "explosive"] = "calm"
+
+
 class ChatResponse(BaseModel):
     text: str
     intensity: Literal["calm", "building", "explosive"] = "calm"
+    # S5: per-line intensity script (hype); drives multi-delivery playback
+    segments: list[Segment] = []
     # web sources from Google Search grounding; empty for ungrounded answers
     sources: list[Source] = []
     # S6: tactical whiteboard, present only for diagram-worthy questions
@@ -116,12 +123,20 @@ class SpeakRequest(BaseModel):
     # multilingual model detects the language from the text itself
     # S1: selects the coach's voice; None falls back to the narrator
     persona: Optional[Literal[*PERSONAS]] = None
+    # S5: when present, each segment is voiced with its own intensity
+    # settings and stitched into one dramatic performance
+    segments: list[Segment] = []
 
 
 @app.post("/speak")
 def speak(req: SpeakRequest) -> Response:
     try:
-        audio = eleven_client.tts(req.text, req.voice_style, req.persona)
+        if req.segments:
+            audio = eleven_client.tts_segments(
+                [s.model_dump() for s in req.segments], req.persona
+            )
+        else:
+            audio = eleven_client.tts(req.text, req.voice_style, req.persona)
     except Exception:
         logger.exception("ElevenLabs call failed")
         raise HTTPException(status_code=502, detail="TTS call failed")
@@ -149,6 +164,7 @@ def hype(req: HypeRequest) -> ChatResponse:
         text=reply["text"],
         intensity=reply["intensity"],
         sources=reply.get("sources", []),
+        segments=reply.get("segments", []),
     )
 
 

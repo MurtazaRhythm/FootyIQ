@@ -16,6 +16,7 @@ interface ChatResponse {
   sources?: Source[];
   diagram?: import("@/lib/types").Diagram | null;
   team?: string | null; // S7: user's stated allegiance
+  segments?: import("@/lib/types").Segment[]; // S5 hype script
 }
 
 const PIPELINE_STEPS: PipelineState[] = ["Thinking", "Generating"];
@@ -156,6 +157,7 @@ export function useChat(persona: Persona, language: Language, voiceReplies = fal
             text: data.text,
             intensity: data.intensity ?? "explosive",
             sources: data.sources ?? [],
+            segments: data.segments ?? [],
             autoSpeak: voiceReplies,
             persona,
             timestamp: Date.now(),

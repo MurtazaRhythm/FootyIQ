@@ -9,6 +9,9 @@ GEMINI_HYPE_MODEL = "gemini-3.1-flash-lite"
 
 # ElevenLabs stock voices only (no cloning of real commentators).
 ELEVEN_MODEL = "eleven_flash_v2_5"
+# S5: flash ignores the expressive `style` setting — dramatic multi-segment
+# performances use the multilingual model where intensity actually lands
+ELEVEN_DRAMA_MODEL = "eleven_multilingual_v2"
 ELEVEN_STT_MODEL = "scribe_v1"
 
 # S1: each coach persona speaks with a distinct stock voice.

@@ -38,10 +38,17 @@ export const SUPPORTING_LABEL: Record<Language, string> = {
   es: "Apoyas a",
 };
 
+// S5: one line of a dramatic performance, voiced with its own intensity
+export interface Segment {
+  text: string;
+  intensity: Intensity;
+}
+
 export interface Message {
   id: string;
   role: "user" | "coach";
   text: string;
+  segments?: Segment[]; // S5 multi-delivery script (hype)
   image?: string; // data URL for user-attached images
   intensity?: Intensity;
   sources?: Source[]; // Google Search grounding citations
