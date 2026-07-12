@@ -1,211 +1,45 @@
 import { useEffect, useRef, useState } from "react";
-import { ImagePlus, Mic, SendHorizonal, Square, X, Zap } from "lucide-react";
-import type {
-  HypeMode,
-  Language,
-  Persona,
-  PipelineState,
-  Message,
+import { ArrowUp, ImagePlus, Megaphone, Mic, X } from "lucide-react";
+import type { HypeMode, Language, Persona, PipelineState, Message } from "@/lib/types";
+import {
+  COMPOSER_PLACEHOLDERS,
+  HYPE_UI,
+  LISTENING_PHRASES,
+  SUGGESTED_PROMPTS,
 } from "@/lib/types";
-import { HYPE_UI, SUGGESTED_PROMPTS } from "@/lib/types";
 import MessageBubble from "@/components/MessageBubble";
-import PersonaPicker from "@/components/PersonaPicker";
+import VoiceOrb from "@/components/ui/voice-orb";
+import { TextShimmer } from "@/components/loading-ui/text-shimmer";
 
 interface ChatPanelProps {
   isActive: boolean;
   messages: Message[];
   pipelineState: PipelineState | null;
-  persona: Persona;
   language: Language;
-  onPersonaChange: (p: Persona) => void;
-  onLanguageChange: (l: Language) => void;
+  persona: Persona;
+  voiceMode: boolean;
+  onVoiceModeToggle: () => void;
   onSend: (text: string, image?: string, opts?: { voice?: boolean }) => void;
   onHype: (team: string, mode: HypeMode) => void;
 }
 
-/** F9: one-tap hype — a small popover above the input bar asking for a team
- *  and a flavor (match preview / trash talk). */
-function HypePopover({
-  language,
-  onGenerate,
-  onClose,
-}: {
-  language: Language;
-  onGenerate: (team: string, mode: HypeMode) => void;
-  onClose: () => void;
-}) {
-  const [team, setTeam] = useState("");
-  const ui = HYPE_UI[language];
-
-  const generate = (mode: HypeMode) => {
-    if (!team.trim()) return;
-    onGenerate(team.trim(), mode);
-    onClose();
-  };
-
-  return (
-    <div className="absolute bottom-full left-0 right-0 mb-2 mx-auto max-w-2xl rounded-md border border-border bg-surface p-4 shadow-xl">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold">{ui.title}</span>
-        <button
-          onClick={onClose}
-          className="w-7 h-7 flex items-center justify-center text-muted hover:text-primary"
-          aria-label="Close hype generator"
-        >
-          <X size={14} />
-        </button>
-      </div>
-      <div className="mt-3 flex flex-col sm:flex-row gap-2">
-        <input
-          value={team}
-          onChange={(e) => setTeam(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && generate("preview")}
-          placeholder={ui.placeholder}
-          autoFocus
-          className="flex-1 rounded-sm border border-border bg-bg px-3 h-10 text-sm placeholder:text-muted focus:outline-none focus:border-accent/50"
-        />
-        <div className="flex gap-2">
-          <button
-            onClick={() => generate("preview")}
-            disabled={!team.trim()}
-            className="h-10 px-4 rounded-sm bg-accent text-black text-sm font-medium disabled:opacity-30"
-          >
-            {ui.preview}
-          </button>
-          <button
-            onClick={() => generate("trash-talk")}
-            disabled={!team.trim()}
-            className="h-10 px-4 rounded-sm border border-accent/60 text-accent text-sm font-medium disabled:opacity-30"
-          >
-            {ui.trashTalk}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-type MicState = "idle" | "recording" | "transcribing";
-
-/** Scribe annotates non-speech as bracketed tags, e.g. "(percussive sound
- *  effects)" or "(silence)" — strip them so noise isn't sent as a question. */
-function cleanTranscript(text: string) {
-  return text.replace(/[([][^)\]]*[)\]]/g, "").trim();
-}
-
-/** Tap to record, tap again to stop: the clip goes to /transcribe (Scribe)
- *  and the transcript is sent as a voice question, whose reply auto-plays —
- *  the full hands-free loop (F8). */
-function MicButton({ onTranscript }: { onTranscript: (text: string) => void }) {
-  const [state, setState] = useState<MicState>("idle");
-  const [error, setError] = useState<string | null>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-
-  const start = async () => {
-    setError(null);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      const chunks: Blob[] = [];
-      recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
-      recorder.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
-        setState("transcribing");
-        try {
-          const form = new FormData();
-          form.append(
-            "audio",
-            new Blob(chunks, { type: recorder.mimeType }),
-            "question",
-          );
-          const res = await fetch("/transcribe", { method: "POST", body: form });
-          if (!res.ok) throw new Error(`transcribe failed: ${res.status}`);
-          const data: { text: string } = await res.json();
-          setState("idle");
-          const text = cleanTranscript(data.text);
-          if (text) {
-            onTranscript(text);
-          } else {
-            setError("Didn't catch that — tap to retry");
-          }
-        } catch {
-          setState("idle");
-          setError("Transcription failed — tap to retry");
-        }
-      };
-      recorderRef.current = recorder;
-      recorder.start();
-      setState("recording");
-    } catch {
-      setError("Mic blocked — allow microphone access and retry");
-    }
-  };
-
-  if (state === "transcribing") {
-    return (
-      <div
-        className="shrink-0 w-11 h-11 flex items-center justify-center rounded-sm border border-border bg-surface"
-        aria-label="Transcribing"
-      >
-        <div className="spinner" />
-      </div>
-    );
-  }
-
-  if (state === "recording") {
-    return (
-      <button
-        onClick={() => recorderRef.current?.stop()}
-        className="shrink-0 w-11 h-11 flex items-center justify-center rounded-sm border border-red-500/60 bg-red-500/10 text-red-400"
-        aria-label="Stop recording"
-      >
-        <Square size={16} fill="currentColor" className="pulse-dot" />
-      </button>
-    );
-  }
-
-  return (
-    <div className="relative shrink-0">
-      {error && (
-        <span
-          role="alert"
-          className="absolute bottom-full left-0 mb-2 whitespace-nowrap rounded-sm border border-red-500/40 bg-surface px-2 py-1 text-xs text-red-400"
-        >
-          {error}
-        </span>
-      )}
-      <button
-        onClick={start}
-        className={`w-11 h-11 flex items-center justify-center rounded-sm border bg-surface transition-colors ${
-          error
-            ? "border-red-500/60 text-red-400"
-            : "border-border text-muted hover:text-primary"
-        }`}
-        aria-label={error ? "Voice input failed, retry" : "Ask by voice"}
-      >
-        <Mic size={18} />
-      </button>
-    </div>
-  );
-}
+const HYPE_MODE_LABELS: Record<Language, Record<HypeMode, string>> = {
+  en: { "preview": "Match Preview", "trash-talk": "Trash Talk" },
+  fr: { "preview": "Avant-match",   "trash-talk": "Chambrage"  },
+  es: { "preview": "Previa",        "trash-talk": "Pique"      },
+};
 
 function PipelineIndicator({ state }: { state: PipelineState }) {
   return (
-    <div className="flex justify-start">
-      <div className="flex items-center gap-3 rounded-md border border-border bg-surface px-4 py-3">
-        <div className="flex gap-1" aria-hidden>
-          <span className="pulse-dot w-1.5 h-1.5 rounded-full bg-accent" />
-          <span
-            className="pulse-dot w-1.5 h-1.5 rounded-full bg-accent"
-            style={{ animationDelay: "0.2s" }}
-          />
-          <span
-            className="pulse-dot w-1.5 h-1.5 rounded-full bg-accent"
-            style={{ animationDelay: "0.4s" }}
-          />
-        </div>
-        <span className="text-xs font-mono text-muted">{state}</span>
-      </div>
+    <div className="flex items-center gap-1.5 pl-0.5">
+      <TextShimmer className="text-sm font-medium" duration={1.6}>
+        {state}
+      </TextShimmer>
+      <span className="flex items-center gap-[3px] mb-[1px]" aria-hidden>
+        <span className="pulse-dot w-[3px] h-[3px] rounded-full bg-muted" />
+        <span className="pulse-dot w-[3px] h-[3px] rounded-full bg-muted" style={{ animationDelay: "0.2s" }} />
+        <span className="pulse-dot w-[3px] h-[3px] rounded-full bg-muted" style={{ animationDelay: "0.4s" }} />
+      </span>
     </div>
   );
 }
@@ -214,19 +48,78 @@ export default function ChatPanel({
   isActive,
   messages,
   pipelineState,
-  persona,
   language,
-  onPersonaChange,
-  onLanguageChange,
+  persona,
+  voiceMode,
+  onVoiceModeToggle,
   onSend,
   onHype,
 }: ChatPanelProps) {
   const [draft, setDraft] = useState("");
   const [image, setImage] = useState<string | null>(null);
-  const [hypeOpen, setHypeOpen] = useState(false);
+  const [hypeMode, setHypeMode] = useState<HypeMode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // suggested prompts rotate in pages of 4 with a crossfade
+  const PROMPTS_PER_PAGE = 4;
+  const prompts = SUGGESTED_PROMPTS[language];
+  const pageCount = Math.ceil(prompts.length / PROMPTS_PER_PAGE);
+  const [promptPage, setPromptPage] = useState(0);
+  const [promptsVisible, setPromptsVisible] = useState(true);
+
+  useEffect(() => {
+    setPromptPage(0);
+    setPromptsVisible(true);
+  }, [language]);
+
+  useEffect(() => {
+    if (isActive || pageCount < 2) return;
+    const interval = setInterval(() => {
+      setPromptsVisible(false);
+      setTimeout(() => {
+        setPromptPage((p) => (p + 1) % pageCount);
+        setPromptsVisible(true);
+      }, 500);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [isActive, pageCount]);
+
+  const visiblePrompts = prompts.slice(
+    promptPage * PROMPTS_PER_PAGE,
+    promptPage * PROMPTS_PER_PAGE + PROMPTS_PER_PAGE,
+  );
+
+  // mic state lives up here because the placeholder rotation depends on it
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const dictationBaseRef = useRef("");
+
+  // composer placeholder rotates with a fade; while the mic is on it cycles
+  // through the listening phrases instead
+  const placeholders = COMPOSER_PLACEHOLDERS[language];
+  const listeningPhrases = LISTENING_PHRASES[language];
+  const [placeholderIdx, setPlaceholderIdx] = useState(0);
+  const [placeholderVisible, setPlaceholderVisible] = useState(true);
+  const activePhrases = listening ? listeningPhrases : placeholders;
+  const placeholderText = activePhrases[placeholderIdx % activePhrases.length];
+
+  useEffect(() => {
+    setPlaceholderIdx(0);
+    setPlaceholderVisible(true);
+  }, [language, listening]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPlaceholderVisible(false);
+      setTimeout(() => {
+        setPlaceholderIdx((i) => (i + 1) % activePhrases.length);
+        setPlaceholderVisible(true);
+      }, 300);
+    }, listening ? 2200 : 4000);
+    return () => clearInterval(interval);
+  }, [listening, activePhrases.length]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
@@ -235,8 +128,7 @@ export default function ChatPanel({
     });
   }, [messages, pipelineState]);
 
-  // downscale to <=1280px on the long edge before upload: phone screenshots
-  // are 3-12 MB and would bloat the base64 payload and Gemini token cost
+  // downscale to <=1280px on the long edge before upload to reduce payload size
   const handleFile = (file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -262,8 +154,18 @@ export default function ChatPanel({
 
   const send = () => {
     const text = draft.trim();
+    if (hypeMode) {
+      if (!text) return;
+      onHype(text, hypeMode);
+      setHypeMode(null);
+      setDraft("");
+      if (textareaRef.current) textareaRef.current.style.height = "auto";
+      return;
+    }
     if (!text && !image) return;
-    onSend(text, image ?? undefined);
+    recognitionRef.current?.abort();
+    onSend(text, image ?? undefined, listening ? { voice: true } : undefined);
+    setListening(false);
     setDraft("");
     setImage(null);
     if (textareaRef.current) textareaRef.current.style.height = "auto";
@@ -283,135 +185,309 @@ export default function ChatPanel({
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
   };
 
+
+  const latestCoachId = [...messages]
+    .reverse()
+    .find((m) => m.role === "coach")?.id;
+
+  // voice dictation via the Web Speech API
+  const SpeechRecognitionImpl =
+    window.SpeechRecognition ?? window.webkitSpeechRecognition;
+
+  useEffect(() => {
+    return () => recognitionRef.current?.abort();
+  }, []);
+
+  // strip non-speech annotations from Web Speech transcripts
+  const cleanTranscript = (text: string) =>
+    text.replace(/[([][^)\]]*[)\]]/g, "").trim();
+
+  const toggleMic = () => {
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    if (!SpeechRecognitionImpl) return;
+
+    const recognition = new SpeechRecognitionImpl();
+    recognition.lang =
+      language === "fr" ? "fr-FR" : language === "es" ? "es-ES" : "en-US";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    // dictation appends to whatever was already typed
+    dictationBaseRef.current = draft.trim();
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let transcript = "";
+      for (let i = 0; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      const base = dictationBaseRef.current;
+      const cleaned = cleanTranscript(transcript);
+      setDraft(base ? `${base} ${cleaned.trimStart()}` : cleaned.trimStart());
+    };
+    recognition.onend = () => setListening(false);
+    recognition.onerror = () => setListening(false);
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setListening(true);
+  };
+
+  const [audioPlaying, setAudioPlaying] = useState(false);
+  const [orbDismissed, setOrbDismissed] = useState(false);
+
+  // reset dismissed state whenever new audio starts
+  useEffect(() => {
+    if (audioPlaying) setOrbDismissed(false);
+  }, [audioPlaying]);
+
+  const resolvedOrbState = pipelineState
+    ? "processing"
+    : audioPlaying
+      ? "speaking"
+      : "idle";
+
+  // show orb when voice mode is on OR audio is actively playing
+  const showOrb = (voiceMode || audioPlaying) && !orbDismissed;
+
+  const handleOrbToggle = () => {
+    if (voiceMode) onVoiceModeToggle();
+    setOrbDismissed(true);
+  };
+
+  const composer = (
+    <div className="relative glass-panel rounded-xl">
+      {image && (
+        <div className="px-3 pt-3">
+          <div className="relative inline-block">
+            <img
+              src={image}
+              alt="preview"
+              className="h-16 w-16 rounded-lg object-cover border border-border"
+            />
+            <button
+              onClick={() => setImage(null)}
+              className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-bg text-muted hover:text-primary"
+              aria-label="Remove image"
+            >
+              <X size={11} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* animated placeholder overlay; native placeholders can't fade */}
+      <div className="relative">
+        {!draft && (
+          <span
+            className={`pointer-events-none absolute left-4 top-3.5 text-sm leading-relaxed transition-all duration-300 ease-out ${
+              listening ? "text-red-400" : "text-muted"
+            } ${
+              hypeMode || placeholderVisible
+                ? "opacity-100 translate-y-0"
+                : "opacity-0 translate-y-1"
+            }`}
+            aria-hidden
+          >
+            {hypeMode ? HYPE_UI[language].placeholder : placeholderText}
+          </span>
+        )}
+        <textarea
+          ref={textareaRef}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onInput={handleInput}
+          rows={1}
+          aria-label="Message"
+          className="w-full resize-none bg-transparent px-4 pt-3.5 pb-1 text-sm leading-relaxed focus:outline-none"
+        />
+      </div>
+
+      <div className="flex items-center justify-between px-2.5 pb-2.5">
+        <div className="flex items-center gap-1.5">
+          {hypeMode ? (
+            /* mode pills inline in the toolbar when hype is active */
+            <div className="flex items-center gap-1 p-0.5 rounded-lg border border-border bg-primary/[0.03]">
+              {(["preview", "trash-talk"] as HypeMode[]).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setHypeMode(m)}
+                  className={`px-2.5 h-6 rounded-md text-[11px] font-medium transition-all ${
+                    hypeMode === m ? "bg-accent text-bg" : "text-muted hover:text-primary"
+                  }`}
+                >
+                  {HYPE_MODE_LABELS[language][m]}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary/5 hover:text-primary"
+              aria-label="Attach image"
+            >
+              <ImagePlus size={16} />
+            </button>
+          )}
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleFile(file);
+            e.target.value = "";
+          }}
+        />
+
+        <div className="flex items-center gap-1.5">
+          {/* hype generator toggle */}
+          <button
+            onClick={() => setHypeMode((m) => m === null ? "preview" : null)}
+            className={
+              hypeMode
+                ? "flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-accent transition-colors"
+                : "flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary/5 hover:text-primary"
+            }
+            aria-label="Hype generator"
+            aria-pressed={hypeMode !== null}
+            title="Hype generator"
+          >
+            <Megaphone size={16} />
+          </button>
+
+          {/* voice mode toggle */}
+          <button
+            onClick={onVoiceModeToggle}
+            className={
+              voiceMode
+                ? "flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-accent transition-colors"
+                : "flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary/5 hover:text-primary"
+            }
+            aria-label={voiceMode ? "Turn voice replies off" : "Turn voice replies on"}
+            aria-pressed={voiceMode}
+          >
+            <svg width="18" height="16" viewBox="0 0 18 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="0"  y="6"  width="2" height="4"  rx="1" fill="currentColor" />
+              <rect x="4"  y="3"  width="2" height="10" rx="1" fill="currentColor" />
+              <rect x="8"  y="0"  width="2" height="16" rx="1" fill="currentColor" />
+              <rect x="12" y="3"  width="2" height="10" rx="1" fill="currentColor" />
+              <rect x="16" y="6"  width="2" height="4"  rx="1" fill="currentColor" />
+            </svg>
+          </button>
+
+          {SpeechRecognitionImpl && (
+            <button
+              onClick={toggleMic}
+              className={
+                listening
+                  ? "mic-listening flex h-8 w-8 items-center justify-center rounded-lg bg-red-500 text-white transition-colors"
+                  : "flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary/5 hover:text-primary"
+              }
+              aria-label={listening ? "Stop dictation" : "Dictate message"}
+              aria-pressed={listening}
+            >
+              <Mic size={16} />
+            </button>
+          )}
+
+          <button
+            onClick={send}
+            disabled={!draft.trim() && !image}
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-bg transition-opacity hover:opacity-90 disabled:opacity-25 disabled:cursor-not-allowed"
+            aria-label="Send message"
+          >
+            <ArrowUp size={16} strokeWidth={2.5} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="flex flex-col h-full pt-14">
-      {/* center zone: landing hero or scrolling message list */}
+    <div className="flex flex-col h-full pt-[68px]">
+      {/* Voice orb overlay — shown when voice mode is on OR audio is playing */}
+      {showOrb && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm">
+          <VoiceOrb
+            state={resolvedOrbState}
+            onToggle={handleOrbToggle}
+            className="w-full h-full"
+          />
+          <button
+            onClick={handleOrbToggle}
+            className="absolute bottom-8 left-1/2 -translate-x-1/2 px-5 py-2 rounded-full text-sm text-white/60 border border-white/10 hover:text-white hover:border-white/30 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
       {!isActive ? (
+        /* landing: hero, suggested prompts, composer directly below them */
         <div className="flex-1 flex flex-col items-center justify-center gap-8 px-4">
-          <div className="text-center">
+          <div className="text-center animate-fade-up" style={{ animationDelay: "0.05s" }}>
             <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
-              FootyIQ
+              Pitchside
             </h1>
             <p className="mt-2 text-sm sm:text-base text-muted">
               Your coach in your pocket for the 2026 World Cup
             </p>
           </div>
-          <PersonaPicker
-            persona={persona}
-            language={language}
-            onPersonaChange={onPersonaChange}
-            onLanguageChange={onLanguageChange}
-          />
-          <div className="flex flex-wrap justify-center gap-2 max-w-xl">
-            {SUGGESTED_PROMPTS[language].map((prompt) => (
+
+          <div
+            className={`flex flex-wrap justify-center gap-2 max-w-xl transition-all duration-500 ease-out animate-fade-up ${
+              promptsVisible
+                ? "opacity-100 translate-y-0"
+                : "opacity-0 translate-y-1.5"
+            }`}
+            style={{ animationDelay: "0.15s" }}
+          >
+            {visiblePrompts.map((prompt) => (
               <button
                 key={prompt}
                 onClick={() => onSend(prompt)}
-                className="px-4 h-9 rounded-full border border-border bg-surface/80 text-xs text-muted hover:text-primary hover:border-accent/40 transition-colors"
+                className="glass-chip px-4 h-8 rounded-full text-xs text-primary/80 hover:text-primary"
               >
-                {prompt}
+                <span className="relative z-10">{prompt}</span>
               </button>
             ))}
           </div>
+
+          <div className="w-full max-w-xl animate-fade-up" style={{ animationDelay: "0.25s" }}>{composer}</div>
         </div>
       ) : (
-        <div
-          ref={scrollRef}
-          className="chat-scroll flex-1 overflow-y-auto px-4 py-6"
-        >
-          {/* aria-live so screen readers announce coach replies as they land */}
-          <div aria-live="polite" className="max-w-2xl mx-auto flex flex-col gap-4">
-            {messages.map((m) => (
-              <MessageBubble key={m.id} message={m} language={language} />
-            ))}
-            {pipelineState && <PipelineIndicator state={pipelineState} />}
-          </div>
-        </div>
-      )}
-
-      {/* input bar */}
-      <div className="relative border-t border-border bg-bg/60 backdrop-blur-md px-4 py-3">
-        {hypeOpen && (
-          <HypePopover
-            language={language}
-            onGenerate={onHype}
-            onClose={() => setHypeOpen(false)}
-          />
-        )}
-        <div className="max-w-2xl mx-auto flex items-end gap-3">
-          {image && (
-            <div className="relative shrink-0">
-              <img
-                src={image}
-                alt="preview"
-                className="w-16 h-16 rounded-lg object-cover border border-border"
-              />
-              <button
-                onClick={() => setImage(null)}
-                className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center rounded-full bg-surface border border-border text-muted hover:text-primary"
-                aria-label="Remove image"
-              >
-                <X size={12} />
-              </button>
+        <>
+          <div
+            ref={scrollRef}
+            className="chat-scroll flex-1 overflow-y-auto px-4 py-8"
+          >
+            <div aria-live="polite" className="max-w-2xl mx-auto flex flex-col gap-7">
+              {messages.map((m) => (
+                <MessageBubble
+                  key={m.id}
+                  message={m}
+                  language={language}
+                  persona={persona}
+                  autoPlayAudio={
+                    (voiceMode || !!m.autoSpeak) && m.id === latestCoachId
+                  }
+                  onAudioPlaying={setAudioPlaying}
+                />
+              ))}
+              {pipelineState && <PipelineIndicator state={pipelineState} />}
             </div>
-          )}
+          </div>
 
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="shrink-0 w-11 h-11 flex items-center justify-center rounded-sm border border-border bg-surface text-muted hover:text-primary transition-colors"
-            aria-label="Attach image"
-          >
-            <ImagePlus size={18} />
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleFile(file);
-              e.target.value = "";
-            }}
-          />
-
-          <MicButton onTranscript={(text) => onSend(text, undefined, { voice: true })} />
-
-          <button
-            onClick={() => setHypeOpen((v) => !v)}
-            className={`shrink-0 w-11 h-11 flex items-center justify-center rounded-sm border transition-colors ${
-              hypeOpen
-                ? "border-accent/60 bg-accent/10 text-accent"
-                : "border-border bg-surface text-muted hover:text-primary"
-            }`}
-            aria-label="Hype generator"
-            aria-expanded={hypeOpen}
-            title="Hype generator"
-          >
-            <Zap size={18} />
-          </button>
-
-          <textarea
-            ref={textareaRef}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onInput={handleInput}
-            rows={1}
-            placeholder="Ask anything about the match..."
-            className="flex-1 resize-none rounded-sm border border-border bg-surface px-4 py-3 text-sm placeholder:text-muted focus:outline-none focus:border-accent/50 transition-colors"
-          />
-
-          <button
-            onClick={send}
-            disabled={!draft.trim() && !image}
-            className="shrink-0 w-11 h-11 flex items-center justify-center rounded-sm bg-accent text-black disabled:opacity-30 disabled:cursor-not-allowed transition-opacity"
-            aria-label="Send message"
-          >
-            <SendHorizonal size={18} />
-          </button>
-        </div>
-      </div>
+          <div className="px-4 pb-6 pt-2">
+            <div className="max-w-2xl mx-auto">{composer}</div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

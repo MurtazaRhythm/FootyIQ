@@ -16,24 +16,22 @@ interface ChatResponse {
   sources?: Source[];
 }
 
-const PIPELINE_STEPS: PipelineState[] = [
-  "thinking",
-  "checking live data",
-  "writing commentary",
-  "generating audio",
-];
+const PIPELINE_STEPS: PipelineState[] = ["Thinking", "Generating"];
 
 let nextId = 0;
 const makeId = () => `msg-${Date.now()}-${nextId++}`;
 
-export function useChat(
-  persona: Persona,
-  language: Language,
-  voiceReplies: boolean,
-) {
+const LANGUAGE_SWITCH_NOTICE: Record<Language, string> = {
+  en: "[The user just switched to English. Respond in English from this point on.]",
+  fr: "[L'utilisateur vient de passer en français. Réponds en français à partir de maintenant.]",
+  es: "[El usuario acaba de cambiar al español. Responde en español a partir de ahora.]",
+};
+
+export function useChat(persona: Persona, language: Language, voiceReplies = false) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [pipelineState, setPipelineState] = useState<PipelineState | null>(null);
   const pipelineTimers = useRef<number[]>([]);
+  const lastLanguageRef = useRef<Language>(language);
 
   const clearPipeline = () => {
     pipelineTimers.current.forEach((t) => window.clearTimeout(t));
@@ -44,11 +42,9 @@ export function useChat(
   // advance through discrete pipeline states while waiting on the backend
   const startPipeline = () => {
     setPipelineState(PIPELINE_STEPS[0]);
-    PIPELINE_STEPS.slice(1).forEach((step, i) => {
-      pipelineTimers.current.push(
-        window.setTimeout(() => setPipelineState(step), (i + 1) * 1800),
-      );
-    });
+    pipelineTimers.current.push(
+      window.setTimeout(() => setPipelineState(PIPELINE_STEPS[1]), 3000),
+    );
   };
 
   const sendMessage = useCallback(
@@ -67,6 +63,13 @@ export function useChat(
         history = prev.map((m) => ({ role: m.role, text: m.text }));
         return [...prev, userMessage];
       });
+
+      // when the user switches language mid-conversation, inject a marker so
+      // Gemini knows to switch even with history in the previous language
+      if (lastLanguageRef.current !== language && history.length > 0) {
+        history = [...history, { role: "user", text: LANGUAGE_SWITCH_NOTICE[language] }];
+      }
+      lastLanguageRef.current = language;
 
       startPipeline();
 
@@ -94,9 +97,9 @@ export function useChat(
             text: data.text,
             intensity: data.intensity ?? "calm",
             sources: data.sources ?? [],
-            // spoken when the global voice toggle is on; voice-initiated
-            // questions always speak (hands-free loop, F8)
+            // spoken when global voice toggle is on; voice-initiated always speak
             autoSpeak: voiceReplies || (opts?.voice ?? false),
+            persona,
             timestamp: Date.now(),
           },
         ]);
@@ -148,6 +151,7 @@ export function useChat(
             intensity: data.intensity ?? "explosive",
             sources: data.sources ?? [],
             autoSpeak: voiceReplies,
+            persona,
             timestamp: Date.now(),
           },
         ]);
@@ -166,7 +170,7 @@ export function useChat(
         clearPipeline();
       }
     },
-    [language, voiceReplies],
+    [language, persona, voiceReplies],
   );
 
   // wipe the session and return to the landing state

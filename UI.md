@@ -34,8 +34,8 @@ Modern, dark, technical-feeling. Reference points: Vercel, Linear, Raycast. Not 
 | `--border` | `#232326` | hairline dividers, card borders |
 | `--text-primary` | `#FAFAFA` | headings, body |
 | `--text-muted` | `#8B8B93` | timestamps, labels, placeholder text |
-| `--accent` | `#00E58C` | primary accent — buttons, active states, particle color |
-| `--accent-dim` | `#00E58C` at 12% opacity | subtle accent fills, hover states |
+| `--accent` | `#818cf8` | primary accent — buttons, active states, particle color |
+| `--accent-dim` | `#818cf8` at 12% opacity | subtle accent fills, hover states |
 
 Emotional-intensity accent variants for commentary cards (F5) — only ever one visible at a time per message:
 
@@ -43,7 +43,7 @@ Emotional-intensity accent variants for commentary cards (F5) — only ever one 
 |---|---|---|
 | calm | cool blue | `#4B9BFF` |
 | building | amber | `#FFC24B` |
-| explosive | full accent | `#00E58C` |
+| explosive | full accent | `#818cf8` |
 
 ### Typography
 
@@ -93,7 +93,7 @@ The flow-field particle canvas is the main background for the **entire app**, no
 **Config for this app:**
 ```tsx
 <NeuralBackground
-  color="#00E58C"      // accent color, not indigo
+  color="#818cf8"      // indigo-400
   trailOpacity={0.12}  // slightly longer trails, calmer motion
   particleCount={500}  // lighter than default 600, keeps it subtle not busy
   speed={0.6}          // slow, ambient — not energetic or distracting
@@ -458,7 +458,7 @@ export default function App() {
         style={{ opacity: isActive ? 0.4 : 1 }}
       >
         <NeuralBackground
-          color="#00E58C"
+          color="#818cf8"
           trailOpacity={0.12}
           particleCount={500}
           speed={0.6}
@@ -547,6 +547,58 @@ The waveform animation must be visible on a projector — size bars at minimum 3
 ### 4.4 Image upload
 
 When a user attaches an image before sending, show a thumbnail (64×64px, rounded-lg, object-cover) inline in the input bar to the left of the textarea. An `×` button on the thumbnail clears it. On send, the thumbnail disappears and the image appears inside the user message bubble.
+
+---
+
+## 5. Voice orb
+
+**Path:** `src/components/ui/voice-orb.tsx`
+
+Canvas-based morphing orb that replaces the plain mic icon. Clicking it toggles voice input; the visual state updates to reflect what's happening.
+
+**States:**
+
+| State | What's happening | Visual |
+|---|---|---|
+| `idle` | mic off, waiting for tap | dim slow pulse, low amplitude |
+| `listening` | mic open, user speaking | bright, fast morph + two expanding ring pulses |
+| `processing` | audio sent, Gemini thinking | fast spin-morph, lighter purple |
+| `speaking` | ElevenLabs audio playing | high-amplitude rhythmic beats, deep indigo |
+
+**Props:**
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `state` | `OrbState` | required | `"idle" \| "listening" \| "processing" \| "speaking"` |
+| `onClick` | `() => void` | — | Tap handler — toggle listening on/off |
+| `size` | `number` | `120` | Width and height in px |
+| `className` | `string` | — | Wrapper classes |
+
+**Usage in `AudioPlayer.tsx` or wherever the mic lives:**
+
+```tsx
+import VoiceOrb, { OrbState } from "@/components/ui/voice-orb";
+
+const [orbState, setOrbState] = useState<OrbState>("idle");
+
+<VoiceOrb
+  state={orbState}
+  size={96}
+  onClick={() => {
+    if (orbState === "idle") {
+      setOrbState("listening");
+      startRecording(); // kick off ElevenLabs Scribe STT
+    } else {
+      setOrbState("idle");
+      stopRecording();
+    }
+  }}
+/>
+```
+
+Wire `setOrbState("processing")` when you fire the `/chat` request, and `setOrbState("speaking")` when the `/speak` audio starts playing. Reset to `"idle"` when audio ends.
+
+**Note:** the animation loop runs once on mount and reads state via a ref — no restarts on state change, no jank.
 
 ---
 

@@ -1,12 +1,9 @@
 export type Persona = "new-fan" | "casual" | "tactics-nerd";
 export type Language = "en" | "fr" | "es";
+export type Theme = "dark" | "light";
 export type Intensity = "calm" | "building" | "explosive";
 
-export type PipelineState =
-  | "thinking"
-  | "checking live data"
-  | "writing commentary"
-  | "generating audio";
+export type PipelineState = "Thinking" | "Generating";
 
 export interface Source {
   title: string;
@@ -20,7 +17,8 @@ export interface Message {
   image?: string; // data URL for user-attached images
   intensity?: Intensity;
   sources?: Source[]; // Google Search grounding citations
-  autoSpeak?: boolean; // voice-initiated turns speak their reply (F8)
+  autoSpeak?: boolean; // voice-initiated turns speak their reply
+  persona?: Persona; // persona active when this message was sent
   timestamp: number;
 }
 
@@ -37,30 +35,72 @@ export const LANGUAGES: { id: Language; label: string }[] = [
 ];
 
 // landing-page starter questions, shown in the user's selected language
+// rendered 4 at a time and rotated with a crossfade on the landing page
 export const SUGGESTED_PROMPTS: Record<Language, string[]> = {
   en: [
     "Why was that goal disallowed for offside?",
     "What does VAR actually check?",
     "Who does Canada play next?",
     "Explain a 4-3-3 like I'm five",
+    "Why do teams park the bus?",
+    "What is a false nine?",
+    "Who is favored to win the World Cup?",
+    "Explain stoppage time simply",
   ],
   fr: [
     "Pourquoi ce but a-t-il été refusé pour hors-jeu ?",
     "Que vérifie la VAR exactement ?",
     "Qui affronte le Canada ensuite ?",
     "Explique-moi le 4-3-3 simplement",
+    "Pourquoi certaines équipes jouent si défensif ?",
+    "C'est quoi un faux neuf ?",
+    "Qui est favori pour gagner la Coupe du monde ?",
+    "Explique le temps additionnel simplement",
   ],
   es: [
     "¿Por qué anularon ese gol por fuera de juego?",
     "¿Qué revisa el VAR exactamente?",
     "¿Contra quién juega Canadá después?",
     "Explícame el 4-3-3 de forma sencilla",
+    "¿Por qué algunos equipos juegan tan defensivo?",
+    "¿Qué es un falso nueve?",
+    "¿Quién es favorito para ganar el Mundial?",
+    "Explícame el tiempo añadido de forma simple",
   ],
+};
+
+// composer placeholder sentences, rotated with a fade
+export const COMPOSER_PLACEHOLDERS: Record<Language, string[]> = {
+  en: [
+    "Ask anything about the match...",
+    "Confused by a ref call? Ask away...",
+    "What just happened on the pitch?",
+    "Get any rule explained, no judgment...",
+  ],
+  fr: [
+    "Pose ta question sur le match...",
+    "Une décision arbitrale te dépasse ? Demande...",
+    "Que vient-il de se passer sur le terrain ?",
+    "Fais-toi expliquer n'importe quelle règle...",
+  ],
+  es: [
+    "Pregunta lo que sea sobre el partido...",
+    "¿No entiendes una decisión del árbitro? Pregunta...",
+    "¿Qué acaba de pasar en la cancha?",
+    "Pide que te expliquen cualquier regla...",
+  ],
+};
+
+// shown in the composer while the mic is on
+export const LISTENING_PHRASES: Record<Language, string[]> = {
+  en: ["Listening now...", "Go ahead...", "Still listening..."],
+  fr: ["J'écoute...", "Vas-y...", "Toujours là..."],
+  es: ["Te escucho...", "Adelante...", "Sigo aquí..."],
 };
 
 export type HypeMode = "preview" | "trash-talk";
 
-// user-bubble label shown when hype is requested (F9)
+// user-bubble label shown when hype is requested
 export const HYPE_LABELS: Record<Language, Record<HypeMode, string>> = {
   en: {
     preview: "Hype me up about {team}!",
@@ -103,5 +143,5 @@ export const HYPE_UI: Record<
 export const INTENSITY_COLORS: Record<Intensity, string> = {
   calm: "#4B9BFF",
   building: "#FFC24B",
-  explosive: "#00E58C",
+  explosive: "#6366F1",
 };

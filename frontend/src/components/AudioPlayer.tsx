@@ -9,7 +9,12 @@ interface AudioPlayerProps {
   text: string;
   intensity: Intensity;
   language: Language;
-  autoPlay?: boolean; // voice-initiated replies speak immediately (F8)
+  /** voice mode: start speaking as soon as the message arrives */
+  autoPlay?: boolean;
+  /** message creation time, so toggling voice mode on later won't replay old messages */
+  createdAt?: number;
+  /** called with true when audio starts, false when it stops */
+  onPlayingChange?: (playing: boolean) => void;
 }
 
 export default function AudioPlayer({
@@ -17,11 +22,13 @@ export default function AudioPlayer({
   intensity,
   language,
   autoPlay = false,
+  createdAt,
+  onPlayingChange,
 }: AudioPlayerProps) {
   const [state, setState] = useState<AudioState>("idle");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const urlRef = useRef<string | null>(null);
-  const startedRef = useRef(false);
+  const autoPlayedRef = useRef(false);
   const color = INTENSITY_COLORS[intensity];
 
   useEffect(() => {
@@ -31,18 +38,11 @@ export default function AudioPlayer({
     };
   }, []);
 
-  useEffect(() => {
-    if (autoPlay && !startedRef.current) {
-      startedRef.current = true;
-      play();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoPlay]);
-
   const stop = () => {
     audioRef.current?.pause();
     if (audioRef.current) audioRef.current.currentTime = 0;
     setState("idle");
+    onPlayingChange?.(false);
   };
 
   const play = async () => {
@@ -54,6 +54,7 @@ export default function AudioPlayer({
     }
 
     setState("loading");
+    onPlayingChange?.(true);
     try {
       const res = await fetch("/speak", {
         method: "POST",
@@ -65,31 +66,43 @@ export default function AudioPlayer({
       const blob = await res.blob();
       urlRef.current = URL.createObjectURL(blob);
       const audio = new Audio(urlRef.current);
-      audio.onended = () => setState("idle");
-      audio.onerror = () => setState("error");
+      audio.onended = () => { setState("idle"); onPlayingChange?.(false); };
+      audio.onerror = () => { setState("error"); onPlayingChange?.(false); };
       audioRef.current = audio;
 
       setState("playing");
+      onPlayingChange?.(true);
       await audio.play();
     } catch {
       setState("error");
+      onPlayingChange?.(false);
     }
   };
 
+  // voice mode: speak fresh messages automatically, exactly once
+  useEffect(() => {
+    if (!autoPlay || autoPlayedRef.current) return;
+    const isFresh = createdAt === undefined || Date.now() - createdAt < 10_000;
+    if (!isFresh) return;
+    autoPlayedRef.current = true;
+    play();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPlay]);
+
   return (
-    <div className="flex items-center gap-3 mt-3">
+    <div className="flex items-center gap-2.5 mt-2">
       {state === "idle" && (
         <button
           onClick={play}
-          className="flex items-center justify-center w-11 h-11 -m-2 text-muted hover:text-primary transition-colors"
+          className="flex items-center justify-center h-7 w-7 -ml-1.5 rounded-lg text-muted transition-colors hover:bg-primary/5 hover:text-primary"
           aria-label="Play audio"
         >
-          <Play size={18} />
+          <Play size={15} />
         </button>
       )}
 
       {state === "loading" && (
-        <div className="flex items-center justify-center w-11 h-11 -m-2">
+        <div className="flex items-center justify-center h-7 w-7 -ml-1.5">
           <div className="spinner" />
         </div>
       )}
@@ -98,11 +111,11 @@ export default function AudioPlayer({
         <>
           <button
             onClick={stop}
-            className="flex items-center justify-center w-11 h-11 -m-2 transition-colors"
+            className="flex items-center justify-center h-7 w-7 -ml-1.5 rounded-lg transition-colors hover:bg-primary/5"
             style={{ color }}
             aria-label="Stop audio"
           >
-            <Square size={16} fill="currentColor" />
+            <Square size={13} fill="currentColor" />
           </button>
           {/* waveform sized to read on a projector */}
           <div className="flex items-end gap-1 h-4" aria-hidden>
