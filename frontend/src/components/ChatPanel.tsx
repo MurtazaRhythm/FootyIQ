@@ -14,8 +14,10 @@ import {
   COMPOSER_PLACEHOLDERS,
   HYPE_UI,
   LISTENING_PHRASES,
+  MIC_ERRORS,
   SUGGESTED_PROMPTS,
   SUPPORTING_LABEL,
+  TAGLINE,
 } from "@/lib/types";
 import MessageBubble from "@/components/MessageBubble";
 import VoiceOrb from "@/components/ui/voice-orb";
@@ -237,9 +239,7 @@ export default function ChatPanel({
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
       // surface it — a silent return makes the button look dead
-      setDraft(
-        "Mic access is blocked — allow the microphone for this site in your browser settings, then try again.",
-      );
+      setDraft(MIC_ERRORS[language].blocked);
       setCallActive(false); // can't hold a call without a mic
       return;
     }
@@ -311,14 +311,13 @@ export default function ChatPanel({
           if (clean) {
             onSend(clean, undefined, { voice: true });
           } else {
-            setDraft("Didn't catch that — try again or type your question.");
+            setDraft(MIC_ERRORS[language].noSpeech);
           }
         } else {
-          const err = await res.json().catch(() => ({}));
-          setDraft(err?.detail ?? "Transcription failed — type your message instead.");
+          setDraft(MIC_ERRORS[language].failed);
         }
       } catch {
-        setDraft("Transcription failed — type your message instead.");
+        setDraft(MIC_ERRORS[language].failed);
       }
       setTranscribing(false);
     };
@@ -630,7 +629,7 @@ export default function ChatPanel({
               ))}
             </h1>
             <p className="mt-2 text-sm sm:text-base text-muted">
-              Your coach in your pocket for the 2026 World Cup
+              {TAGLINE[language]}
             </p>
           </div>
 

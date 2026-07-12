@@ -31,6 +31,38 @@ export interface Diagram {
   arrows?: DiagramArrow[];
 }
 
+// hero tagline (the "Pitchside" wordmark itself stays untranslated)
+export const TAGLINE: Record<Language, string> = {
+  en: "Your coach in your pocket for the 2026 World Cup",
+  fr: "Ton coach de poche pour la Coupe du monde 2026",
+  es: "Tu entrenador de bolsillo para el Mundial 2026",
+};
+
+// mic-flow error hints, shown in the composer draft
+export const MIC_ERRORS: Record<
+  Language,
+  { blocked: string; noSpeech: string; failed: string }
+> = {
+  en: {
+    blocked:
+      "Mic access is blocked — allow the microphone for this site in your browser settings, then try again.",
+    noSpeech: "Didn't catch that — try again or type your question.",
+    failed: "Transcription failed — type your message instead.",
+  },
+  fr: {
+    blocked:
+      "Micro bloqué — autorise le microphone pour ce site dans les réglages du navigateur, puis réessaie.",
+    noSpeech: "Je n'ai rien entendu — réessaie ou écris ta question.",
+    failed: "La transcription a échoué — écris ton message à la place.",
+  },
+  es: {
+    blocked:
+      "Micrófono bloqueado — permite el micrófono para este sitio en los ajustes del navegador y vuelve a intentarlo.",
+    noSpeech: "No te escuché — inténtalo de nuevo o escribe tu pregunta.",
+    failed: "La transcripción falló — escribe tu mensaje.",
+  },
+};
+
 // S7: label for the session-memory chip ("Supporting: Morocco 🇲🇦")
 export const SUPPORTING_LABEL: Record<Language, string> = {
   en: "Supporting",
