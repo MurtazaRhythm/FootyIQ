@@ -1,9 +1,9 @@
 {
   "rewrites": [
-    { "source": "/chat", "destination": "https://pitchside-backend.onrender.com/chat" },
-    { "source": "/speak", "destination": "https://pitchside-backend.onrender.com/speak" },
-    { "source": "/transcribe", "destination": "https://pitchside-backend.onrender.com/transcribe" },
-    { "source": "/hype", "destination": "https://pitchside-backend.onrender.com/hype" },
-    { "source": "/health", "destination": "https://pitchside-backend.onrender.com/health" }
+    { "source": "/chat", "destination": "https://pitchside-backend-wu83.onrender.com/chat" },
+    { "source": "/speak", "destination": "https://pitchside-backend-wu83.onrender.com/speak" },
+    { "source": "/transcribe", "destination": "https://pitchside-backend-wu83.onrender.com/transcribe" },
+    { "source": "/hype", "destination": "https://pitchside-backend-wu83.onrender.com/hype" },
+    { "source": "/health", "destination": "https://pitchside-backend-wu83.onrender.com/health" }
   ]
 }
