@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, ImagePlus, Megaphone, Mic, X } from "lucide-react";
+import { ArrowUp, Camera, ImagePlus, Megaphone, Mic, X } from "lucide-react";
 import type { HypeMode, Language, Persona, PipelineState, Message } from "@/lib/types";
 import {
   COMPOSER_PLACEHOLDERS,
@@ -69,8 +69,14 @@ export default function ChatPanel({
     return () => clearInterval(cycle);
   }, [isActive]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // S3: show the straight-to-camera button only where a camera is likely
+  const isTouchDevice =
+    typeof window !== "undefined" &&
+    window.matchMedia("(pointer: coarse)").matches;
 
   // suggested prompts rotate in pages of 4 with a crossfade
   const PROMPTS_PER_PAGE = 4;
@@ -359,19 +365,46 @@ export default function ChatPanel({
               ))}
             </div>
           ) : (
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary/5 hover:text-primary"
-              aria-label="Attach image"
-            >
-              <ImagePlus size={16} />
-            </button>
+            <>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary/5 hover:text-primary"
+                aria-label="Attach image"
+              >
+                <ImagePlus size={16} />
+              </button>
+              {/* S3: touch devices get a straight-to-camera button — point
+                  the phone at the TV's VAR freeze-frame and ask */}
+              {isTouchDevice && (
+                <button
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary/5 hover:text-primary"
+                  aria-label="Take a photo"
+                >
+                  <Camera size={16} />
+                </button>
+              )}
+            </>
           )}
         </div>
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleFile(file);
+            e.target.value = "";
+          }}
+        />
+        {/* S3: capture="environment" opens the rear camera directly on
+            mobile; desktop never sees this input (button is touch-only) */}
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
