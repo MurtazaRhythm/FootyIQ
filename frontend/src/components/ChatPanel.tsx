@@ -35,7 +35,7 @@ function PipelineIndicator({ state }: { state: PipelineState }) {
       <TextShimmer className="text-sm font-medium" duration={1.6}>
         {state}
       </TextShimmer>
-      <span className="flex items-center gap-[3px] mb-[1px]" aria-hidden>
+      <span className="flex items-center gap-[3px] translate-y-[3px]" aria-hidden>
         <span className="pulse-dot w-[3px] h-[3px] rounded-full bg-muted" />
         <span className="pulse-dot w-[3px] h-[3px] rounded-full bg-muted" style={{ animationDelay: "0.2s" }} />
         <span className="pulse-dot w-[3px] h-[3px] rounded-full bg-muted" style={{ animationDelay: "0.4s" }} />
@@ -103,8 +103,9 @@ export default function ChatPanel({
 
   // mic state lives up here because the placeholder rotation depends on it
   const [listening, setListening] = useState(false);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const dictationBaseRef = useRef("");
+  const [transcribing, setTranscribing] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   // composer placeholder rotates with a fade; while the mic is on it cycles
   // through the listening phrases instead
@@ -137,6 +138,10 @@ export default function ChatPanel({
       behavior: "smooth",
     });
   }, [messages, pipelineState]);
+
+  useEffect(() => {
+    return () => mediaRecorderRef.current?.stop();
+  }, []);
 
   // downscale to <=1280px on the long edge before upload to reduce payload size
   const handleFile = (file: File) => {
@@ -173,8 +178,8 @@ export default function ChatPanel({
       return;
     }
     if (!text && !image) return;
-    recognitionRef.current?.abort();
-    onSend(text, image ?? undefined, listening ? { voice: true } : undefined);
+    mediaRecorderRef.current?.stop();
+    onSend(text, image ?? undefined);
     setListening(false);
     setDraft("");
     setImage(null);
@@ -200,69 +205,75 @@ export default function ChatPanel({
     .reverse()
     .find((m) => m.role === "coach")?.id;
 
-  // voice dictation via the Web Speech API
-  const SpeechRecognitionImpl =
-    window.SpeechRecognition ?? window.webkitSpeechRecognition;
-
-  useEffect(() => {
-    return () => recognitionRef.current?.abort();
-  }, []);
-
-  // strip non-speech annotations from Web Speech transcripts
-  const cleanTranscript = (text: string) =>
-    text.replace(/[([][^)\]]*[)\]]/g, "").trim();
-
-  const toggleMic = () => {
+  const toggleMic = async () => {
     if (listening) {
-      recognitionRef.current?.stop();
+      mediaRecorderRef.current?.stop();
       return;
     }
-    if (!SpeechRecognitionImpl) return;
 
-    const recognition = new SpeechRecognitionImpl();
-    recognition.lang =
-      language === "fr" ? "fr-FR" : language === "es" ? "es-ES" : "en-US";
-    recognition.continuous = true;
-    recognition.interimResults = true;
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      return; // mic access denied
+    }
 
-    // dictation appends to whatever was already typed
-    dictationBaseRef.current = draft.trim();
+    const recorder = new MediaRecorder(stream);
+    audioChunksRef.current = [];
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let transcript = "";
-      for (let i = 0; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
-      }
-      const base = dictationBaseRef.current;
-      const cleaned = cleanTranscript(transcript);
-      setDraft(base ? `${base} ${cleaned.trimStart()}` : cleaned.trimStart());
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) audioChunksRef.current.push(e.data);
     };
-    recognition.onend = () => setListening(false);
-    recognition.onerror = () => setListening(false);
 
-    recognitionRef.current = recognition;
-    recognition.start();
+    recorder.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop());
+      setListening(false);
+      setTranscribing(true);
+      try {
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const form = new FormData();
+        form.append("audio", blob, "voice.webm");
+        const res = await fetch("/transcribe", { method: "POST", body: form });
+        if (res.ok) {
+          const { text } = await res.json();
+          if (text.trim()) onSend(text.trim(), undefined, { voice: true });
+        } else {
+          const err = await res.json().catch(() => ({}));
+          setDraft(err?.detail ?? "Transcription failed — type your message instead.");
+        }
+      } catch {
+        setDraft("Transcription failed — type your message instead.");
+      }
+      setTranscribing(false);
+    };
+
+    mediaRecorderRef.current = recorder;
+    recorder.start();
     setListening(true);
   };
 
   const [audioPlaying, setAudioPlaying] = useState(false);
   const [orbDismissed, setOrbDismissed] = useState(false);
+  const [stopSignal, setStopSignal] = useState(0);
 
   // reset dismissed state whenever new audio starts
   useEffect(() => {
     if (audioPlaying) setOrbDismissed(false);
   }, [audioPlaying]);
 
-  const resolvedOrbState = pipelineState
+  const resolvedOrbState = pipelineState || transcribing
     ? "processing"
     : audioPlaying
       ? "speaking"
-      : "idle";
+      : listening
+        ? "listening"
+        : "idle";
 
-  // show orb when voice mode is on OR audio is actively playing
-  const showOrb = (voiceMode || audioPlaying) && !orbDismissed;
+  const showOrb = (voiceMode || listening || transcribing) && !orbDismissed;
+  const showAudioGlow = audioPlaying && !showOrb;
 
   const handleOrbToggle = () => {
+    if (listening) mediaRecorderRef.current?.stop();
     if (voiceMode) onVoiceModeToggle();
     setOrbDismissed(true);
   };
@@ -391,20 +402,21 @@ export default function ChatPanel({
             </svg>
           </button>
 
-          {SpeechRecognitionImpl && (
-            <button
-              onClick={toggleMic}
-              className={
-                listening
-                  ? "mic-listening flex h-8 w-8 items-center justify-center rounded-lg bg-red-500 text-white transition-colors"
+          <button
+            onClick={toggleMic}
+            disabled={transcribing}
+            className={
+              listening
+                ? "mic-listening flex h-8 w-8 items-center justify-center rounded-lg bg-red-500 text-white transition-colors"
+                : transcribing
+                  ? "flex h-8 w-8 items-center justify-center rounded-lg text-accent transition-colors"
                   : "flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary/5 hover:text-primary"
-              }
-              aria-label={listening ? "Stop dictation" : "Dictate message"}
-              aria-pressed={listening}
-            >
-              <Mic size={16} />
-            </button>
-          )}
+            }
+            aria-label={listening ? "Stop recording" : "Voice message"}
+            aria-pressed={listening}
+          >
+            {transcribing ? <div className="spinner" /> : <Mic size={16} />}
+          </button>
 
           <button
             onClick={send}
@@ -421,17 +433,35 @@ export default function ChatPanel({
 
   return (
     <div className="flex flex-col h-full pt-14">
-      {/* Voice orb overlay — shown when voice mode is on OR audio is playing */}
+      {/* Centered glow orb when AI is speaking */}
+      {showAudioGlow && (
+        <div className="fixed inset-0 z-40 pointer-events-none">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div style={{ width: 64, height: 64 }}>
+              <VoiceOrb state="speaking" onToggle={() => {}} hideIcon forceAnimated />
+            </div>
+          </div>
+          <button
+            onClick={() => setStopSignal((s) => s + 1)}
+            className="absolute bottom-28 left-1/2 -translate-x-1/2 px-5 py-2 rounded-full text-sm text-white/60 border border-white/10 hover:text-white hover:border-white/30 transition-colors pointer-events-auto"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Voice orb overlay — shown when voice mode is on OR recording/transcribing */}
       {showOrb && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm">
           <VoiceOrb
             state={resolvedOrbState}
             onToggle={handleOrbToggle}
             className="w-full h-full"
+            hideIcon
           />
           <button
             onClick={handleOrbToggle}
-            className="absolute bottom-8 left-1/2 -translate-x-1/2 px-5 py-2 rounded-full text-sm text-white/60 border border-white/10 hover:text-white hover:border-white/30 transition-colors"
+            className="absolute bottom-28 left-1/2 -translate-x-1/2 px-5 py-2 rounded-full text-sm text-white/60 border border-white/10 hover:text-white hover:border-white/30 transition-colors"
           >
             Cancel
           </button>
@@ -499,9 +529,14 @@ export default function ChatPanel({
                     (voiceMode || !!m.autoSpeak) && m.id === latestCoachId
                   }
                   onAudioPlaying={setAudioPlaying}
+                  stopSignal={stopSignal}
                 />
               ))}
-              {pipelineState && <PipelineIndicator state={pipelineState} />}
+              {pipelineState && (
+                <div className="flex justify-start">
+                  <PipelineIndicator state={pipelineState} />
+                </div>
+              )}
             </div>
           </div>
 

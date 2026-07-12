@@ -12,13 +12,22 @@ interface MessageBubbleProps {
   /** voice mode: auto-speak this message when it arrives */
   autoPlayAudio?: boolean;
   onAudioPlaying?: (playing: boolean) => void;
+  stopSignal?: number;
 }
 
 const COACH = {
   "tactics-nerd": { src: pepAvatar,  name: "El Maestro",      position: "50% 10%" },
-  "new-fan":      { src: pochAvatar, name: "El Poch",          position: "50% 15%" },
+  "new-fan":      { src: pochAvatar, name: "El Pocho",         position: "50% 15%" },
   "casual":       { src: joseAvatar, name: "The Special One",  position: "50% 15%" },
 } satisfies Record<Persona, { src: string; name: string; position: string }>;
+
+function renderText(text: string) {
+  return text.split(/(\*\*.*?\*\*)/g).map((chunk, i) =>
+    chunk.startsWith("**") && chunk.endsWith("**")
+      ? <strong key={i}>{chunk.slice(2, -2)}</strong>
+      : chunk
+  );
+}
 
 function formatTime(ts: number) {
   return new Date(ts).toLocaleTimeString([], {
@@ -33,6 +42,7 @@ export default function MessageBubble({
   persona,
   autoPlayAudio = false,
   onAudioPlaying,
+  stopSignal,
 }: MessageBubbleProps) {
   if (message.role === "user") {
     return (
@@ -75,7 +85,7 @@ export default function MessageBubble({
       </div>
       <div className="max-w-[85%]">
         <p className="text-sm leading-7 whitespace-pre-wrap text-primary/90">
-          {message.text}
+          {renderText(message.text)}
         </p>
         {message.sources && message.sources.length > 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/50 pt-2">
@@ -102,6 +112,7 @@ export default function MessageBubble({
             autoPlay={autoPlayAudio}
             createdAt={message.timestamp}
             onPlayingChange={onAudioPlaying}
+            stopSignal={stopSignal}
           />
           <span className="text-[11px] text-muted opacity-0 transition-opacity group-hover:opacity-100">
             {formatTime(message.timestamp)}

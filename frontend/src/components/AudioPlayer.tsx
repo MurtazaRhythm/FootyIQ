@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { AlertCircle, Play, Square } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import type { Intensity, Language } from "@/lib/types";
 import { INTENSITY_COLORS } from "@/lib/types";
 
@@ -15,6 +15,8 @@ interface AudioPlayerProps {
   createdAt?: number;
   /** called with true when audio starts, false when it stops */
   onPlayingChange?: (playing: boolean) => void;
+  /** increment to force-stop playback */
+  stopSignal?: number;
 }
 
 export default function AudioPlayer({
@@ -24,6 +26,7 @@ export default function AudioPlayer({
   autoPlay = false,
   createdAt,
   onPlayingChange,
+  stopSignal = 0,
 }: AudioPlayerProps) {
   const [state, setState] = useState<AudioState>("idle");
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -38,6 +41,11 @@ export default function AudioPlayer({
     };
   }, []);
 
+  useEffect(() => {
+    if (stopSignal > 0) stop();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stopSignal]);
+
   const stop = () => {
     audioRef.current?.pause();
     if (audioRef.current) audioRef.current.currentTime = 0;
@@ -49,6 +57,7 @@ export default function AudioPlayer({
     // reuse the already-fetched audio if we have it
     if (audioRef.current && urlRef.current) {
       setState("playing");
+      onPlayingChange?.(true);
       audioRef.current.play();
       return;
     }
@@ -89,44 +98,12 @@ export default function AudioPlayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoPlay]);
 
+  const isPlaying = state === "playing";
+  const isLoading = state === "loading";
+
   return (
     <div className="flex items-center gap-2.5 mt-2">
-      {state === "idle" && (
-        <button
-          onClick={play}
-          className="flex items-center justify-center h-7 w-7 -ml-1.5 rounded-lg text-muted transition-colors hover:bg-primary/5 hover:text-primary"
-          aria-label="Play audio"
-        >
-          <Play size={15} />
-        </button>
-      )}
-
-      {state === "loading" && (
-        <div className="flex items-center justify-center h-7 w-7 -ml-1.5">
-          <div className="spinner" />
-        </div>
-      )}
-
-      {state === "playing" && (
-        <>
-          <button
-            onClick={stop}
-            className="flex items-center justify-center h-7 w-7 -ml-1.5 rounded-lg transition-colors hover:bg-primary/5"
-            style={{ color }}
-            aria-label="Stop audio"
-          >
-            <Square size={13} fill="currentColor" />
-          </button>
-          {/* waveform sized to read on a projector */}
-          <div className="flex items-end gap-1 h-4" aria-hidden>
-            <span className="waveform-bar" style={{ backgroundColor: color }} />
-            <span className="waveform-bar" style={{ backgroundColor: color }} />
-            <span className="waveform-bar" style={{ backgroundColor: color }} />
-          </div>
-        </>
-      )}
-
-      {state === "error" && (
+      {state === "error" ? (
         <button
           onClick={play}
           className="flex items-center gap-2 text-muted text-xs"
@@ -134,6 +111,25 @@ export default function AudioPlayer({
         >
           <AlertCircle size={16} />
           <span>audio unavailable</span>
+        </button>
+      ) : (
+        <button
+          onClick={isPlaying ? stop : play}
+          className="flex items-center justify-center h-7 w-7 -ml-1.5 rounded-lg transition-colors hover:bg-primary/5"
+          style={{ color: isPlaying ? color : undefined }}
+          aria-label={isPlaying ? "Stop audio" : "Play audio"}
+        >
+          {isLoading ? (
+            <div className="spinner" />
+          ) : (
+            <svg width="18" height="16" viewBox="0 0 18 16" fill="none" xmlns="http://www.w3.org/2000/svg" className={isPlaying ? "" : "text-muted"}>
+              <rect x="0"  y="6"  width="2" height="4"  rx="1" fill="currentColor" />
+              <rect x="4"  y="3"  width="2" height="10" rx="1" fill="currentColor" />
+              <rect x="8"  y="0"  width="2" height="16" rx="1" fill="currentColor" />
+              <rect x="12" y="3"  width="2" height="10" rx="1" fill="currentColor" />
+              <rect x="16" y="6"  width="2" height="4"  rx="1" fill="currentColor" />
+            </svg>
+          )}
         </button>
       )}
     </div>

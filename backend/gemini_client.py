@@ -15,7 +15,7 @@ from config import (
     get_key,
 )
 
-_client: genai.Client | None = None
+_client: genai.Client | None = None  # reset on reload
 
 
 def client() -> genai.Client:
@@ -37,11 +37,10 @@ LANGUAGE_NAMES = {"en": "English", "fr": "French", "es": "Spanish"}
 # fancier wording of the same content (PRD F1 acceptance criteria).
 PERSONA_INSTRUCTIONS = {
     "new-fan": (
-        "The user has NEVER watched soccer. Lead with an everyday-life analogy "
-        "that maps the concept to something universally familiar (queues, board "
-        "games, cooking, traffic), then unpack it in plain language. Zero "
-        "jargon — if a soccer term is unavoidable, define it in the same "
-        "sentence. Keep it warm and short: 2–4 sentences."
+        "The user is new to soccer. Explain clearly and warmly without being "
+        "condescending — no forced analogies, no over-explaining basic facts. "
+        "Define a jargon term only if it's genuinely unfamiliar (not 'goal' or "
+        "'team'). Keep it conversational and concise: 2–4 sentences max."
     ),
     "casual": (
         "The user plays FIFA/EA FC and watches highlights. Answer as a short "
@@ -67,12 +66,14 @@ INTENSITY_RULE = (
 )
 
 GROUNDING_RULE = (
-    "You have access to Google Search. Use it whenever the answer depends on "
-    "live or recent tournament data — fixtures, results, standings, squads, "
-    "injuries, 'next opponent' reasoning — even if the user doesn't mention a "
-    "date. Never guess or invent real-world match facts: if the question "
-    "needs current data, search. Timeless questions (rules, general tactics) "
-    "don't need search."
+    "You have access to Google Search. ALWAYS search before stating any "
+    "specific match result, score, scoreline, or 'who won' fact — even if "
+    "you think you know the answer. Never fabricate or assume a result: if "
+    "search returns no clear evidence for a specific result, say you could "
+    "not find confirmed data rather than guessing. Use search for anything "
+    "involving live tournament data: fixtures, results, standings, squads, "
+    "injuries, or 'next opponent' reasoning. Timeless questions (rules, "
+    "tactics) don't need search."
 )
 
 # Intensity rides on a tag line we parse off, not structured output:
@@ -85,13 +86,21 @@ INTENSITY_TAG_RULE = (
 )
 
 
+COACH_PERSONAS = {
+    "new-fan":      ("El Pocho",        "warm, encouraging, patient — like Pochettino building belief"),
+    "casual":       ("The Special One", "confident, charismatic, a bit theatrical — like Mourinho"),
+    "tactics-nerd": ("El Maestro",      "precise, cerebral, analytical — like Guardiola"),
+}
+
+
 def build_system_prompt(persona: str, language: str) -> str:
+    coach_name, coach_style = COACH_PERSONAS[persona]
     return "\n\n".join(
         [
-            "You are FootyIQ, a friendly personal soccer coach helping someone "
+            f"You are {coach_name}, a personal soccer coach helping someone "
             "follow the 2026 FIFA World Cup (hosted by Canada, the USA, and "
-            "Mexico). You explain rules, tactics, refereeing decisions, and "
-            "tournament context.",
+            f"Mexico). Your personality is {coach_style}. "
+            f"Always refer to yourself as {coach_name}, never as FootyIQ.",
             PERSONA_INSTRUCTIONS[persona],
             f"Respond natively in {LANGUAGE_NAMES[language]} — do not "
             "translate from English; write directly in that language with "
@@ -100,6 +109,8 @@ def build_system_prompt(persona: str, language: str) -> str:
             INTENSITY_RULE,
             "If the user references earlier context (their team, their "
             "level), carry it forward naturally.",
+            "Avoid em dashes (—). Use commas, conjunctions, or short "
+            "sentences instead.",
             INTENSITY_TAG_RULE,
         ]
     )
@@ -169,6 +180,7 @@ def generate_reply(
         config=types.GenerateContentConfig(
             system_instruction=build_system_prompt(persona, language),
             tools=[types.Tool(google_search=types.GoogleSearch())],
+            max_output_tokens=400,
         ),
     )
 
@@ -221,6 +233,7 @@ def generate_hype(team: str, mode: str, language: str) -> dict:
         config=types.GenerateContentConfig(
             system_instruction=system,
             tools=[types.Tool(google_search=types.GoogleSearch())],
+            max_output_tokens=250,
         ),
     )
     text = response.text or ""

@@ -1,0 +1,16 @@
+# secrets
+backend/local_config.py
+
+# python
+__pycache__/
+*.py[cod]
+backend/venv/
+backend/audio_cache/
+
+# node
+node_modules/
+frontend/dist/
+
+# misc
+.DS_Store
+*.env

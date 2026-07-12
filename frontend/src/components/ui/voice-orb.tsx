@@ -7,9 +7,11 @@ interface VoiceOrbProps {
   state: OrbState;
   onToggle: () => void;
   className?: string;
+  hideIcon?: boolean;
+  forceAnimated?: boolean;
 }
 
-export default function VoiceOrb({ state, onToggle, className }: VoiceOrbProps) {
+export default function VoiceOrb({ state, onToggle, className, hideIcon = false, forceAnimated = false }: VoiceOrbProps) {
   const [checked, setChecked] = useState(false);
 
   const toggle = () => {
@@ -32,8 +34,8 @@ export default function VoiceOrb({ state, onToggle, className }: VoiceOrbProps) 
         </filter>
       </svg>
 
-      <div className={cn("orb", checked ? "orb-checked" : "orb-unchecked")} onClick={toggle}>
-        <div className="icons">
+      <div className={cn("orb", checked ? "orb-checked" : "orb-unchecked", forceAnimated && "orb-force-animated")} onClick={toggle}>
+        <div className="icons" style={{ opacity: hideIcon ? 0 : undefined }}>
           <svg
             className="svg"
             xmlns="http://www.w3.org/2000/svg"

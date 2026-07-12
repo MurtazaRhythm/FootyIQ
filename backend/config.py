@@ -3,13 +3,13 @@ or environment variables — never here."""
 
 # Gemini: Flash for chat latency; Pro where reasoning depth shows — image
 # understanding (F3) and hype scripts (F9). Pro needs the paid credits.
-GEMINI_CHAT_MODEL = "gemini-flash-latest"
-GEMINI_VISION_MODEL = "gemini-pro-latest"
-GEMINI_HYPE_MODEL = "gemini-pro-latest"
+GEMINI_CHAT_MODEL = "gemini-3.1-flash-lite"
+GEMINI_VISION_MODEL = "gemini-3.1-flash-lite"
+GEMINI_HYPE_MODEL = "gemini-3.1-flash-lite"
 
 # ElevenLabs stock voices only (no cloning of real commentators).
 # George — deep British narrator; swap the ID to change the commentator.
-ELEVEN_MODEL = "eleven_multilingual_v2"
+ELEVEN_MODEL = "eleven_flash_v2_5"
 ELEVEN_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"
 ELEVEN_STT_MODEL = "scribe_v1"
 

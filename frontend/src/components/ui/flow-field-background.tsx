@@ -8,6 +8,7 @@ interface NeuralBackgroundProps {
    * Defaults to a cyan/indigo mix if not specified.
    */
   color?: string;
+  colors?: string[];
   /**
    * The opacity of the trails (0.0 to 1.0).
    * Lower = longer trails. Higher = shorter trails.
@@ -31,12 +32,14 @@ interface NeuralBackgroundProps {
 
 export default function NeuralBackground({
   className,
-  color = "#6366f1", // Default Indigo
+  color = "#6366f1",
+  colors,
   trailOpacity = 0.15,
   particleCount = 600,
   speed = 1,
   backgroundRgb = "0, 0, 0",
 }: NeuralBackgroundProps) {
+  const palette = colors && colors.length > 0 ? colors : [color];
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -63,6 +66,7 @@ export default function NeuralBackground({
       vy: number;
       age: number;
       life: number;
+      color: string;
 
       constructor() {
         this.x = Math.random() * width;
@@ -70,8 +74,8 @@ export default function NeuralBackground({
         this.vx = 0;
         this.vy = 0;
         this.age = 0;
-        // Random lifespan to create natural recycling
         this.life = Math.random() * 200 + 100;
+        this.color = palette[Math.floor(Math.random() * palette.length)];
       }
 
       update() {
@@ -122,10 +126,11 @@ export default function NeuralBackground({
         this.vy = 0;
         this.age = 0;
         this.life = Math.random() * 200 + 100;
+        this.color = palette[Math.floor(Math.random() * palette.length)];
       }
 
       draw(context: CanvasRenderingContext2D) {
-        context.fillStyle = color;
+        context.fillStyle = this.color;
         // No age-based fade: particles stay at full brightness (no flicker)
         context.globalAlpha = 1;
         context.fillRect(this.x, this.y, 1.5, 1.5); // Tiny dots are faster than arcs
@@ -150,10 +155,6 @@ export default function NeuralBackground({
 
     // --- ANIMATION LOOP ---
     const animate = () => {
-      // "Fade" effect: Instead of clearing the canvas, we draw a semi-transparent rect
-      // This creates the "Trails" look.
-      // We use the background color of the parent or a dark overlay.
-      // Assuming dark mode for this effect usually:
       ctx.fillStyle = `rgba(${backgroundRgb}, ${trailOpacity})`;
       ctx.fillRect(0, 0, width, height);
 
@@ -200,7 +201,7 @@ export default function NeuralBackground({
       document.documentElement.removeEventListener("mouseleave", handleMouseLeave);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [color, trailOpacity, particleCount, speed, backgroundRgb]);
+  }, [color, colors, trailOpacity, particleCount, speed, backgroundRgb]);
 
   return (
     <div

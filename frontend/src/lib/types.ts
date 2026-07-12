@@ -1,6 +1,5 @@
 export type Persona = "new-fan" | "casual" | "tactics-nerd";
 export type Language = "en" | "fr" | "es";
-export type Theme = "dark" | "light";
 export type Intensity = "calm" | "building" | "explosive";
 
 export type PipelineState = "Thinking" | "Generating";
@@ -97,6 +96,8 @@ export const LISTENING_PHRASES: Record<Language, string[]> = {
   fr: ["J'écoute...", "Vas-y...", "Toujours là..."],
   es: ["Te escucho...", "Adelante...", "Sigo aquí..."],
 };
+
+export type Theme = "dark" | "light";
 
 export type HypeMode = "preview" | "trash-talk";
 

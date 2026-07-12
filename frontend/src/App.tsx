@@ -7,22 +7,21 @@ import { useChat } from "@/hooks/useChat";
 import { useWindowSize } from "@/hooks/useWindowSize";
 import type { Language, Persona, Theme } from "@/lib/types";
 
-/** Landing: full coverage. Chat: dimmed, masked to corners/edges only. */
+/** Full on landing; edges-only during chat via a radial mask (no transition on mask). */
 function LandingBackground({ visible, theme }: { visible: boolean; theme: Theme }) {
   const { width } = useWindowSize();
   const particleCount = width < 640 ? 300 : 600;
 
   return (
     <div
-      className="fixed inset-0 transition-all duration-700"
+      className="fixed inset-0"
       style={{
-        opacity: visible ? 1 : 0.5,
         maskImage: visible
           ? "none"
-          : "radial-gradient(ellipse 55% 55% at 50% 50%, transparent 40%, black 100%)",
+          : "radial-gradient(ellipse 50% 60% at 50% 50%, transparent 35%, black 80%)",
         WebkitMaskImage: visible
           ? "none"
-          : "radial-gradient(ellipse 55% 55% at 50% 50%, transparent 40%, black 100%)",
+          : "radial-gradient(ellipse 50% 60% at 50% 50%, transparent 35%, black 80%)",
       }}
       aria-hidden
     >
@@ -30,6 +29,7 @@ function LandingBackground({ visible, theme }: { visible: boolean; theme: Theme 
         color={theme === "light" ? "#4f46e5" : "#6366f1"}
         backgroundRgb={theme === "light" ? "246, 246, 248" : "0, 0, 0"}
         particleCount={particleCount}
+        speed={0.2}
       />
     </div>
   );
@@ -52,6 +52,7 @@ export default function App() {
     document
       .querySelector('meta[name="theme-color"]')
       ?.setAttribute("content", theme === "light" ? "#F6F6F8" : "#0A0A0B");
+
   }, [theme]);
 
   const { messages, pipelineState, sendMessage, sendHype, resetChat } = useChat(
@@ -85,9 +86,7 @@ export default function App() {
           theme={theme}
           onPersonaChange={setPersona}
           onLanguageChange={setLanguage}
-          onThemeToggle={() =>
-            setTheme((t) => (t === "dark" ? "light" : "dark"))
-          }
+          onThemeToggle={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
           onHomeClick={() => setConfirmingHome(true)}
         />
         <ChatPanel
