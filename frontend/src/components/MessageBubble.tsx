@@ -1,5 +1,4 @@
 import type { Language, Message, Persona } from "@/lib/types";
-import { INTENSITY_COLORS } from "@/lib/types";
 import AudioPlayer from "@/components/AudioPlayer";
 import pepAvatar from "/pep.jpg";
 import joseAvatar from "/jose.jpg";
@@ -67,7 +66,6 @@ export default function MessageBubble({
   }
 
   const intensity = message.intensity ?? "calm";
-  const accentColor = INTENSITY_COLORS[intensity];
   const coach = COACH[message.persona ?? persona];
 
   return (
@@ -109,6 +107,7 @@ export default function MessageBubble({
             text={message.text}
             intensity={intensity}
             language={language}
+            persona={message.persona ?? persona}
             autoPlay={autoPlayAudio}
             createdAt={message.timestamp}
             onPlayingChange={onAudioPlaying}

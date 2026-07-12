@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertCircle } from "lucide-react";
-import type { Intensity, Language } from "@/lib/types";
+import type { Intensity, Language, Persona } from "@/lib/types";
 import { INTENSITY_COLORS } from "@/lib/types";
 
 type AudioState = "idle" | "loading" | "playing" | "error";
@@ -9,6 +9,8 @@ interface AudioPlayerProps {
   text: string;
   intensity: Intensity;
   language: Language;
+  /** S1: selects the coach's voice on the backend */
+  persona?: Persona;
   /** voice mode: start speaking as soon as the message arrives */
   autoPlay?: boolean;
   /** message creation time, so toggling voice mode on later won't replay old messages */
@@ -23,6 +25,7 @@ export default function AudioPlayer({
   text,
   intensity,
   language,
+  persona,
   autoPlay = false,
   createdAt,
   onPlayingChange,
@@ -68,7 +71,7 @@ export default function AudioPlayer({
       const res = await fetch("/speak", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice_style: intensity, language }),
+        body: JSON.stringify({ text, voice_style: intensity, language, persona }),
       });
       if (!res.ok) throw new Error(`speak request failed: ${res.status}`);
 

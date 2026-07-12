@@ -10,10 +10,11 @@ from pathlib import Path
 import httpx
 
 from config import (
+    ELEVEN_DEFAULT_VOICE,
     ELEVEN_MODEL,
     ELEVEN_STT_MODEL,
-    ELEVEN_VOICE_ID,
     ELEVEN_VOICE_SETTINGS,
+    ELEVEN_VOICES,
     get_key,
 )
 
@@ -33,26 +34,28 @@ def _api_key() -> str:
     return key
 
 
-def _cache_path(text: str, intensity: str) -> Path:
+def _cache_path(text: str, intensity: str, voice_id: str) -> Path:
     key = json.dumps(
-        [text, ELEVEN_VOICE_ID, ELEVEN_MODEL, ELEVEN_VOICE_SETTINGS[intensity]],
+        [text, voice_id, ELEVEN_MODEL, ELEVEN_VOICE_SETTINGS[intensity]],
         ensure_ascii=False,
     )
     return CACHE_DIR / f"{hashlib.sha256(key.encode()).hexdigest()}.mp3"
 
 
-def tts(text: str, intensity: str) -> bytes:
-    """Returns MP3 bytes. The multilingual model auto-detects the language
-    from the text itself, so FR/ES answers speak natively (F6) without a
-    language parameter. Raises on API failure."""
-    path = _cache_path(text, intensity)
+def tts(text: str, intensity: str, persona: str | None = None) -> bytes:
+    """Returns MP3 bytes, voiced by the coach mapped to `persona` (S1).
+    The multilingual model auto-detects the language from the text itself,
+    so FR/ES answers speak natively (F6) without a language parameter.
+    Raises on API failure."""
+    voice_id = ELEVEN_VOICES.get(persona or "", ELEVEN_DEFAULT_VOICE)
+    path = _cache_path(text, intensity, voice_id)
     if path.exists():
         return path.read_bytes()
 
     # one retry: a transient ElevenLabs 429/5xx shouldn't kill a demo playback
     for attempt in range(2):
         response = httpx.post(
-            TTS_URL.format(voice_id=ELEVEN_VOICE_ID),
+            TTS_URL.format(voice_id=voice_id),
             headers={"xi-api-key": _api_key()},
             json={
                 "text": text,

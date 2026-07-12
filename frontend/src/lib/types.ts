@@ -39,7 +39,7 @@ export const SUGGESTED_PROMPTS: Record<Language, string[]> = {
   en: [
     "Why was that goal disallowed for offside?",
     "What does VAR actually check?",
-    "Who does Canada play next?",
+    "Who plays in the next semifinal?",
     "Explain a 4-3-3 like I'm five",
     "Why do teams park the bus?",
     "What is a false nine?",
@@ -49,7 +49,7 @@ export const SUGGESTED_PROMPTS: Record<Language, string[]> = {
   fr: [
     "Pourquoi ce but a-t-il été refusé pour hors-jeu ?",
     "Que vérifie la VAR exactement ?",
-    "Qui affronte le Canada ensuite ?",
+    "Qui joue la prochaine demi-finale ?",
     "Explique-moi le 4-3-3 simplement",
     "Pourquoi certaines équipes jouent si défensif ?",
     "C'est quoi un faux neuf ?",
@@ -59,7 +59,7 @@ export const SUGGESTED_PROMPTS: Record<Language, string[]> = {
   es: [
     "¿Por qué anularon ese gol por fuera de juego?",
     "¿Qué revisa el VAR exactamente?",
-    "¿Contra quién juega Canadá después?",
+    "¿Quiénes juegan la próxima semifinal?",
     "Explícame el 4-3-3 de forma sencilla",
     "¿Por qué algunos equipos juegan tan defensivo?",
     "¿Qué es un falso nueve?",

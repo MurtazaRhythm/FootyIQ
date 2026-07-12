@@ -87,12 +87,14 @@ class SpeakRequest(BaseModel):
     voice_style: Literal["calm", "building", "explosive"] = "calm"
     language: Literal[*LANGUAGES] = "en"  # accepted for future use; the
     # multilingual model detects the language from the text itself
+    # S1: selects the coach's voice; None falls back to the narrator
+    persona: Optional[Literal[*PERSONAS]] = None
 
 
 @app.post("/speak")
 def speak(req: SpeakRequest) -> Response:
     try:
-        audio = eleven_client.tts(req.text, req.voice_style)
+        audio = eleven_client.tts(req.text, req.voice_style, req.persona)
     except Exception:
         logger.exception("ElevenLabs call failed")
         raise HTTPException(status_code=502, detail="TTS call failed")

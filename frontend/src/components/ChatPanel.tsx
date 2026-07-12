@@ -215,7 +215,11 @@ export default function ChatPanel({
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
-      return; // mic access denied
+      // surface it — a silent return makes the button look dead
+      setDraft(
+        "Mic access is blocked — allow the microphone for this site in your browser settings, then try again.",
+      );
+      return;
     }
 
     const recorder = new MediaRecorder(stream);
@@ -236,7 +240,14 @@ export default function ChatPanel({
         const res = await fetch("/transcribe", { method: "POST", body: form });
         if (res.ok) {
           const { text } = await res.json();
-          if (text.trim()) onSend(text.trim(), undefined, { voice: true });
+          // Scribe tags non-speech as "(percussive sound effects)" etc. —
+          // strip annotations so noise is never sent as a question
+          const clean = text.replace(/[([][^)\]]*[)\]]/g, "").trim();
+          if (clean) {
+            onSend(clean, undefined, { voice: true });
+          } else {
+            setDraft("Didn't catch that — try again or type your question.");
+          }
         } else {
           const err = await res.json().catch(() => ({}));
           setDraft(err?.detail ?? "Transcription failed — type your message instead.");
@@ -250,6 +261,8 @@ export default function ChatPanel({
     mediaRecorderRef.current = recorder;
     recorder.start();
     setListening(true);
+    // a previous orb dismissal shouldn't hide the orb for new recordings
+    setOrbDismissed(false);
   };
 
   const [audioPlaying, setAudioPlaying] = useState(false);
@@ -269,12 +282,13 @@ export default function ChatPanel({
         ? "listening"
         : "idle";
 
-  const showOrb = (voiceMode || listening || transcribing) && !orbDismissed;
+  // the orb belongs to the mic flow only — voiceMode is just the
+  // auto-speak mute and shouldn't summon a full-screen overlay
+  const showOrb = (listening || transcribing) && !orbDismissed;
   const showAudioGlow = audioPlaying && !showOrb;
 
   const handleOrbToggle = () => {
     if (listening) mediaRecorderRef.current?.stop();
-    if (voiceMode) onVoiceModeToggle();
     setOrbDismissed(true);
   };
 

@@ -8,10 +8,16 @@ GEMINI_VISION_MODEL = "gemini-3.1-flash-lite"
 GEMINI_HYPE_MODEL = "gemini-3.1-flash-lite"
 
 # ElevenLabs stock voices only (no cloning of real commentators).
-# George — deep British narrator; swap the ID to change the commentator.
 ELEVEN_MODEL = "eleven_flash_v2_5"
-ELEVEN_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"
 ELEVEN_STT_MODEL = "scribe_v1"
+
+# S1: each coach persona speaks with a distinct stock voice.
+ELEVEN_VOICES = {
+    "new-fan": "bIHbv24MWmeRgasZH58o",  # Will — relaxed optimist (El Pocho)
+    "casual": "IKne3meq5aSn9XLyUdCD",  # Charlie — deep, confident (The Special One)
+    "tactics-nerd": "onwK4e9ZLuTAKqWW03F9",  # Daniel — steady broadcaster (El Maestro)
+}
+ELEVEN_DEFAULT_VOICE = "JBFqnCBsd6RMkjVDRZzb"  # George — narrator fallback
 
 # Intensity → delivery. Lower stability + higher style = more dramatic,
 # less predictable read; a goal-mouth scramble should not sound like a

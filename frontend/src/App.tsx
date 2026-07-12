@@ -39,8 +39,9 @@ export default function App() {
   const [persona, setPersona] = useState<Persona>("new-fan");
   const [language, setLanguage] = useState<Language>("en");
   const [confirmingHome, setConfirmingHome] = useState(false);
+  // spoken replies are on by default; the waveform toggle mutes them
   const [voiceMode, setVoiceMode] = useState(
-    () => localStorage.getItem("voiceMode") === "1",
+    () => localStorage.getItem("voiceMode") !== "0",
   );
   const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem("theme") as Theme) ?? "dark",
