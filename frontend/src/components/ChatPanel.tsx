@@ -1,11 +1,21 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Camera, ImagePlus, Megaphone, Mic, Phone, X } from "lucide-react";
+import {
+  ArrowUp,
+  Camera,
+  Heart,
+  ImagePlus,
+  Megaphone,
+  Mic,
+  Phone,
+  X,
+} from "lucide-react";
 import type { HypeMode, Language, Persona, PipelineState, Message } from "@/lib/types";
 import {
   COMPOSER_PLACEHOLDERS,
   HYPE_UI,
   LISTENING_PHRASES,
   SUGGESTED_PROMPTS,
+  SUPPORTING_LABEL,
 } from "@/lib/types";
 import MessageBubble from "@/components/MessageBubble";
 import VoiceOrb from "@/components/ui/voice-orb";
@@ -18,6 +28,7 @@ interface ChatPanelProps {
   language: Language;
   persona: Persona;
   voiceMode: boolean;
+  supportedTeam: string | null; // S7: visible session memory
   onVoiceModeToggle: () => void;
   onSend: (text: string, image?: string, opts?: { voice?: boolean }) => void;
   onHype: (team: string, mode: HypeMode) => void;
@@ -51,6 +62,7 @@ export default function ChatPanel({
   language,
   persona,
   voiceMode,
+  supportedTeam,
   onVoiceModeToggle,
   onSend,
   onHype,
@@ -672,7 +684,18 @@ export default function ChatPanel({
           </div>
 
           <div className="px-4 pb-6 pt-2">
-            <div className="max-w-2xl mx-auto">{composer}</div>
+            <div className="max-w-2xl mx-auto">
+              {/* S7: the session's remembered allegiance, at a glance */}
+              {supportedTeam && (
+                <div className="mb-2 flex animate-fade-up">
+                  <span className="glass-chip inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-[11px] text-primary/80">
+                    <Heart size={11} className="text-accent" aria-hidden />
+                    {SUPPORTING_LABEL[language]}: {supportedTeam}
+                  </span>
+                </div>
+              )}
+              {composer}
+            </div>
           </div>
         </>
       )}

@@ -56,11 +56,8 @@ export default function App() {
 
   }, [theme]);
 
-  const { messages, pipelineState, sendMessage, sendHype, resetChat } = useChat(
-    persona,
-    language,
-    voiceMode,
-  );
+  const { messages, pipelineState, team, sendMessage, sendHype, resetChat } =
+    useChat(persona, language, voiceMode);
 
   const toggleVoiceMode = () => {
     setVoiceMode((v) => {
@@ -97,6 +94,7 @@ export default function App() {
           language={language}
           persona={persona}
           voiceMode={voiceMode}
+          supportedTeam={team}
           onVoiceModeToggle={toggleVoiceMode}
           onSend={sendMessage}
           onHype={sendHype}

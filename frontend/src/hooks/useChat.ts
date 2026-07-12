@@ -15,6 +15,7 @@ interface ChatResponse {
   intensity?: Intensity;
   sources?: Source[];
   diagram?: import("@/lib/types").Diagram | null;
+  team?: string | null; // S7: user's stated allegiance
 }
 
 const PIPELINE_STEPS: PipelineState[] = ["Thinking", "Generating"];
@@ -30,6 +31,8 @@ const LANGUAGE_SWITCH_NOTICE: Record<Language, string> = {
 
 export function useChat(persona: Persona, language: Language, voiceReplies = false) {
   const [messages, setMessages] = useState<Message[]>([]);
+  // S7: the team the user said they support, shown as a chip near the composer
+  const [team, setTeam] = useState<string | null>(null);
   const [pipelineState, setPipelineState] = useState<PipelineState | null>(null);
   const pipelineTimers = useRef<number[]>([]);
   const lastLanguageRef = useRef<Language>(language);
@@ -90,6 +93,7 @@ export function useChat(persona: Persona, language: Language, voiceReplies = fal
         if (!res.ok) throw new Error(`chat request failed: ${res.status}`);
 
         const data: ChatResponse = await res.json();
+        if (data.team) setTeam(data.team);
         setMessages((prev) => [
           ...prev,
           {
@@ -179,7 +183,8 @@ export function useChat(persona: Persona, language: Language, voiceReplies = fal
   const resetChat = useCallback(() => {
     clearPipeline();
     setMessages([]);
+    setTeam(null); // session-only memory dies with the session
   }, []);
 
-  return { messages, pipelineState, sendMessage, sendHype, resetChat };
+  return { messages, pipelineState, team, sendMessage, sendHype, resetChat };
 }

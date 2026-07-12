@@ -86,6 +86,17 @@ INTENSITY_TAG_RULE = (
     "then the answer on the following lines."
 )
 
+# S7: surface the invisible F10 session memory — the model reports the
+# user's stated allegiance so the UI can show it as a chip.
+TEAM_TAG_RULE = (
+    "On the line right after the DIAGRAM line, write exactly "
+    "'TEAM: <team name> <flag emoji>' if the user has explicitly stated "
+    "which team THEY support (in this message or earlier in the "
+    "conversation, e.g. 'I'm supporting Morocco', 'my team is France'), "
+    "or 'TEAM: none' otherwise. Asking about a team is not supporting it. "
+    "If they switch allegiance, report the newest one."
+)
+
 # S6: the main call only *tags* diagram-worthiness; a separate structured
 # call draws it, so the whiteboard can never break the chat path.
 DIAGRAM_TAG_RULE = (
@@ -126,6 +137,7 @@ def build_system_prompt(persona: str, language: str) -> str:
             "sentences instead.",
             INTENSITY_TAG_RULE,
             DIAGRAM_TAG_RULE,
+            TEAM_TAG_RULE,
         ]
     )
 
@@ -156,6 +168,7 @@ INTENSITY_TAG_RE = re.compile(
     r"^\s*INTENSITY:\s*(calm|building|explosive)\s*\n?", re.IGNORECASE
 )
 DIAGRAM_TAG_RE = re.compile(r"^\s*DIAGRAM:\s*(yes|no)\s*\n?", re.IGNORECASE)
+TEAM_TAG_RE = re.compile(r"^\s*TEAM:\s*(.+?)\s*(?:\n|$)", re.IGNORECASE)
 
 # Pitch coordinates: x 0-100 (attacking left -> right), y 0-65 (top -> bottom)
 DIAGRAM_SCHEMA = types.Schema(
@@ -296,7 +309,14 @@ def generate_reply(
     match = INTENSITY_TAG_RE.match(text)
     text = INTENSITY_TAG_RE.sub("", text, count=1)
     diagram_match = DIAGRAM_TAG_RE.match(text)
-    text = DIAGRAM_TAG_RE.sub("", text, count=1).strip()
+    text = DIAGRAM_TAG_RE.sub("", text, count=1)
+    team_match = TEAM_TAG_RE.match(text)
+    text = TEAM_TAG_RE.sub("", text, count=1).strip()
+
+    # S7: the user's stated allegiance, or None if they haven't declared one
+    team = team_match.group(1).strip() if team_match else None
+    if team and team.lower() in ("none", "aucune", "ninguno", "ninguna"):
+        team = None
 
     # S6: only tactics-shaped questions get the second, diagram-drawing call
     diagram = None
@@ -308,6 +328,7 @@ def generate_reply(
         "intensity": match.group(1).lower() if match else "calm",
         "sources": _extract_sources(response),
         "diagram": diagram,
+        "team": team,
     }
 
 

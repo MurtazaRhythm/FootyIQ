@@ -77,6 +77,8 @@ class ChatResponse(BaseModel):
     sources: list[Source] = []
     # S6: tactical whiteboard, present only for diagram-worthy questions
     diagram: Optional[Diagram] = None
+    # S7: the user's stated team allegiance, e.g. "Morocco 🇲🇦"
+    team: Optional[str] = None
 
 
 @app.get("/health")
@@ -103,6 +105,7 @@ def chat(req: ChatRequest) -> ChatResponse:
         intensity=reply["intensity"],
         sources=reply.get("sources", []),
         diagram=reply.get("diagram"),
+        team=reply.get("team"),
     )
 
 

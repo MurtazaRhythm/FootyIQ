@@ -31,6 +31,13 @@ export interface Diagram {
   arrows?: DiagramArrow[];
 }
 
+// S7: label for the session-memory chip ("Supporting: Morocco 🇲🇦")
+export const SUPPORTING_LABEL: Record<Language, string> = {
+  en: "Supporting",
+  fr: "Ton équipe",
+  es: "Apoyas a",
+};
+
 export interface Message {
   id: string;
   role: "user" | "coach";
