@@ -1,0 +1,19 @@
+# Render blueprint: deploys the FastAPI backend from this repo.
+# Dashboard: New + -> Blueprint -> select this repo -> Apply.
+# Keys are entered in the Render dashboard (sync: false), never committed.
+services:
+  - type: web
+    name: pitchside-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
