@@ -12,6 +12,11 @@ function LandingBackground({ visible, theme }: { visible: boolean; theme: Theme 
   const { width } = useWindowSize();
   const particleCount = width < 640 ? 300 : 600;
 
+  // F7: respect prefers-reduced-motion — no particle animation at all
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    return null;
+  }
+
   return (
     <div
       className="fixed inset-0"

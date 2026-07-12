@@ -13,7 +13,7 @@
 | **F4** Search grounding | ✅ | Live lookup + reasoning question grounded w/ cited sources; rules question doesn't search |
 | **F5** Commentator voice (TTS) | ✅ | 3 intensity deliveries; 28ms cached / ~4s uncached; George stock voice |
 | **F6** Multilingual audio | ✅ | French/Spanish text speaks natively (auto-detected) |
-| **F7** Accessibility | ✅ | Larger-text toggle (16→20px), reduced-motion, aria-live replies, focus rings |
+| **F7** Accessibility | ✅ | Reduced-motion, aria-live replies, focus rings; rem-based UI scales with browser/OS text zoom (dedicated aA toggle dropped in the redesign by choice) |
 | **F8** Voice input (Scribe) | ✅ | Full hands-free loop in-browser: spoken question → spoken answer, no keyboard |
 | **F9** Hype generator | ✅ | Grounded preview + trash-talk for a chosen team, EN/FR/ES, voiceable |
 | **F10** In-session memory | ✅ | Team stated in msg 1 referenced in a relevant answer turns later |
